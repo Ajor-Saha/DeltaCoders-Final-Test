@@ -1,32 +1,35 @@
-import { Request, Response } from "express";
-import { v4 as uuidv4 } from "uuid";
-import { db } from "../db";
-import { eq } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { ApiResponse } from "../utils/api-response";
-import { userTable } from "../db/schema/tbl-user";
-import { sendVerificationEmail } from "../utils/send-verification-email";
-import { generateVerificationCode } from "../utils/generate-verification-code";
-import { generateExpiryDate } from "../utils/generate-verification-code";
-import jwt from "jsonwebtoken";
-import { asyncHandler } from "../utils/asyncHandler";
-import { createR2Client } from "../utils/upload-r2";
-import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { nanoid } from "nanoid";
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { Request, Response } from 'express';
 import fs from 'fs/promises';
+import jwt from 'jsonwebtoken';
+import { nanoid } from 'nanoid';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../db';
+import { userTable } from '../db/schema/tbl-user';
+import { ApiResponse } from '../utils/api-response';
+import { asyncHandler } from '../utils/asyncHandler';
+import {
+  generateExpiryDate,
+  generateVerificationCode,
+} from '../utils/generate-verification-code';
+import { sendVerificationEmail } from '../utils/send-verification-email';
+import { createR2Client } from '../utils/upload-r2';
 
-export const signup = asyncHandler(
-  async (req: Request, res: Response) => {
+export const signup = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { firstName, lastName, email, password, companyId } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
     // Validate required fields
     if (
-      [firstName, lastName, email, password, companyId].some(
-        (field) => !field || field.trim() === ""
+      [firstName, lastName, email, password].some(
+        field => !field || field.trim() === ''
       )
     ) {
-      return res.status(400).json(new ApiResponse(400, {}, "All fields are required"));
+      return res
+        .status(400)
+        .json(new ApiResponse(400, {}, 'All fields are required'));
     }
 
     // Check if the user already exists by email
@@ -47,11 +50,9 @@ export const signup = asyncHandler(
         res
           .status(400)
           .json(
-            new ApiResponse(400, {}, "User already exists with this email")
+            new ApiResponse(400, {}, 'User already exists with this email')
           );
       }
-
-      
 
       // If the user is not verified, update their details
       await db
@@ -73,8 +74,8 @@ export const signup = asyncHandler(
       if (!emailResponse.success) {
         res
           .status(500)
-          .json(new ApiResponse(500, {}, "Failed to send verification email"));
-      } 
+          .json(new ApiResponse(500, {}, 'Failed to send verification email'));
+      }
 
       return res
         .status(200)
@@ -82,7 +83,7 @@ export const signup = asyncHandler(
           new ApiResponse(
             200,
             { email, firstName },
-            "User details updated. Please verify your email."
+            'User details updated. Please verify your email.'
           )
         );
     }
@@ -94,11 +95,10 @@ export const signup = asyncHandler(
       lastName,
       email,
       password: hashedPassword,
-      companyId,
       verifyCode,
       verifyCodeExpiry,
       isVerified: false,
-      role: "admin" as const,
+      role: 'admin' as const,
     };
 
     await db.insert(userTable).values(newUser);
@@ -113,8 +113,8 @@ export const signup = asyncHandler(
     if (!emailResponse.success) {
       return res
         .status(500)
-        .json(new ApiResponse(500, {}, "Failed to send verification email"));
-    } 
+        .json(new ApiResponse(500, {}, 'Failed to send verification email'));
+    }
 
     return res
       .status(201)
@@ -122,25 +122,23 @@ export const signup = asyncHandler(
         new ApiResponse(
           201,
           { newUser },
-          "User registered successfully. Please verify your email."
+          'User registered successfully. Please verify your email.'
         )
       );
   } catch (error) {
-    console.error("Error during signup:", error);
-    res.status(500).json(new ApiResponse(500, null, "Internal server error"));
+    console.error('Error during signup:', error);
+    res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
   }
 });
 
-
-export const login = asyncHandler(
-  async (req: Request, res: Response) => {
+export const login = asyncHandler(async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if ([email, password].some((field) => !field || field.trim() === "")) {
+    if ([email, password].some(field => !field || field.trim() === '')) {
       return res
         .status(400)
-        .json(new ApiResponse(400, {}, "Email and password are required"));
+        .json(new ApiResponse(400, {}, 'Email and password are required'));
     }
 
     const user = await db
@@ -151,13 +149,21 @@ export const login = asyncHandler(
     if (!user || !user[0].isVerified) {
       return res
         .status(404)
-        .json(new ApiResponse(404, {}, "User not found or Not Verified or Not Admin"));
+        .json(
+          new ApiResponse(
+            404,
+            {},
+            'User not found or Not Verified or Not Admin'
+          )
+        );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user[0].password);
 
     if (!isPasswordValid) {
-      return res.status(401).json(new ApiResponse(401, {}, "Invalid credentials"));
+      return res
+        .status(401)
+        .json(new ApiResponse(401, {}, 'Invalid credentials'));
     }
 
     let accessToken;
@@ -165,68 +171,78 @@ export const login = asyncHandler(
       accessToken = jwt.sign(
         { userId: user[0].userId, email: user[0].email },
         process.env.JWT_SECRET as string,
-        { expiresIn: "1d" }
+        { expiresIn: '1d' }
       );
     } catch (jwtError) {
-      console.error("JWT Error:", jwtError);
+      console.error('JWT Error:', jwtError);
       return res
         .status(500)
-        .json(new ApiResponse(500, null, "Failed to generate token"));
+        .json(new ApiResponse(500, null, 'Failed to generate token'));
     }
 
     // Cookie options based on environment
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
-      ...(process.env.NODE_ENV === "production" && {
-        domain: ".taskforges.com",
+      sameSite:
+        process.env.NODE_ENV === 'production'
+          ? ('none' as const)
+          : ('lax' as const),
+      ...(process.env.NODE_ENV === 'production' && {
+        domain: '.taskforges.com',
       }),
-      path: "/"
+      path: '/',
     };
 
     // Set the access token as a cookie
-    res.cookie("accessToken", accessToken, cookieOptions);
+    res.cookie('accessToken', accessToken, cookieOptions);
 
     const loginUser = user[0];
 
     return res.status(200).json({
       data: loginUser,
       accessToken: accessToken,
-      message: "Login successful",
+      message: 'Login successful',
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json(new ApiResponse(500, null, "Internal server error"));
+    return res
+      .status(500)
+      .json(new ApiResponse(500, null, 'Internal server error'));
   }
 });
 
-
-export const logout = asyncHandler(
-  async (req: Request, res: Response) => {
+export const logout = asyncHandler(async (req: Request, res: Response) => {
   try {
     if (!req.user) {
-      return res.status(401).json(new ApiResponse(401, {}, "Unauthorized request"));
+      return res
+        .status(401)
+        .json(new ApiResponse(401, {}, 'Unauthorized request'));
     }
 
     // Cookie clearing options based on environment
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" as const : "lax" as const,
-      ...(process.env.NODE_ENV === "production" && {
-        domain: ".taskforges.com",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite:
+        process.env.NODE_ENV === 'production'
+          ? ('none' as const)
+          : ('lax' as const),
+      ...(process.env.NODE_ENV === 'production' && {
+        domain: '.taskforges.com',
       }),
-      path: "/"
+      path: '/',
     };
 
-    res.clearCookie("accessToken", cookieOptions);
+    res.clearCookie('accessToken', cookieOptions);
 
-    return res.status(200).json(new ApiResponse(200, {}, "Logout successful"));
+    return res.status(200).json(new ApiResponse(200, {}, 'Logout successful'));
   } catch (error) {
     console.log(error);
-    return res.status(500).json(new ApiResponse(500, null, "Internal server error"));
+    return res
+      .status(500)
+      .json(new ApiResponse(500, null, 'Internal server error'));
   }
 });
 
@@ -242,7 +258,7 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
       .where(eq(userTable.email, decodedEmail));
 
     if (user.length === 0) {
-      return res.status(404).json(new ApiResponse(404, {}, "User not found"));
+      return res.status(404).json(new ApiResponse(404, {}, 'User not found'));
     }
 
     const existingUser = user[0];
@@ -258,12 +274,13 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
           new ApiResponse(
             400,
             {},
-            "Verification code has expired. Please sign up again to get a new code."
+            'Verification code has expired. Please sign up again to get a new code.'
           )
         );
     }
 
-    const isCodeNotExpired = new Date(existingUser.verifyCodeExpiry) > new Date();
+    const isCodeNotExpired =
+      new Date(existingUser.verifyCodeExpiry) > new Date();
 
     if (isCodeValid && isCodeNotExpired) {
       // Update user's verification status
@@ -274,7 +291,7 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
 
       return res
         .status(200)
-        .json(new ApiResponse(200, {}, "Account verified successfully"));
+        .json(new ApiResponse(200, {}, 'Account verified successfully'));
     } else if (!isCodeNotExpired) {
       return res
         .status(400)
@@ -282,107 +299,126 @@ export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
           new ApiResponse(
             400,
             {},
-            "Verification code has expired. Please sign up again to get a new code."
+            'Verification code has expired. Please sign up again to get a new code.'
           )
         );
     } else {
       return res
         .status(400)
-        .json(new ApiResponse(400, {}, "Incorrect verification code"));
+        .json(new ApiResponse(400, {}, 'Incorrect verification code'));
     }
   } catch (error) {
-    console.error("Error verifying user:", error);
-    return res.status(500).json(new ApiResponse(500, {}, "Error verifying user"));
+    console.error('Error verifying user:', error);
+    return res
+      .status(500)
+      .json(new ApiResponse(500, {}, 'Error verifying user'));
   }
 });
 
-export const updateProfilePicture = asyncHandler(async (req: Request, res: Response) => {
-  try {
-    // Ensure the authenticated user exists
-    const authUser = req.user;
-    if (!authUser) {
-      return res.status(401).json(new ApiResponse(401, {}, 'Unauthorized: User is missing'));
-    }
-
-
-    const file = req.avatar;
-   
-
-    if (!file || !file.filepath) {
-      return res.status(400).json(new ApiResponse(400, {}, 'No file uploaded or invalid file'));
-    }
-
-    // Create R2 client (S3-compatible client)
-    const r2 = createR2Client();
-
-    // Retrieve existing user from the database
-    const existingUser = await db
-      .select()
-      .from(userTable)
-      .where(eq(userTable.userId, authUser.userId))
-      .limit(1);
-
-    if (!existingUser.length) {
-      return res.status(404).json(new ApiResponse(404, {}, 'User not found'));
-    }
-
-    const existedUser = existingUser[0];
-
-    // Delete previous profile picture from R2 if it exists
-    if (existedUser.avatar) {
-      const currentImageKey = existedUser.avatar.replace(`${process.env.PUBLIC_ACCESS_URL}/`, '');
-      if (currentImageKey) {
-        await r2.send(
-          new DeleteObjectCommand({
-            Bucket: process.env.BUCKET_NAME!,
-            Key: currentImageKey,
-          })
-        );
+export const updateProfilePicture = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      // Ensure the authenticated user exists
+      const authUser = req.user;
+      if (!authUser) {
+        return res
+          .status(401)
+          .json(new ApiResponse(401, {}, 'Unauthorized: User is missing'));
       }
+
+      const file = req.avatar;
+
+      if (!file || !file.filepath) {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'No file uploaded or invalid file'));
+      }
+
+      // Create R2 client (S3-compatible client)
+      const r2 = createR2Client();
+
+      // Retrieve existing user from the database
+      const existingUser = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.userId, authUser.userId))
+        .limit(1);
+
+      if (!existingUser.length) {
+        return res.status(404).json(new ApiResponse(404, {}, 'User not found'));
+      }
+
+      const existedUser = existingUser[0];
+
+      // Delete previous profile picture from R2 if it exists
+      if (existedUser.avatar) {
+        const currentImageKey = existedUser.avatar.replace(
+          `${process.env.PUBLIC_ACCESS_URL}/`,
+          ''
+        );
+        if (currentImageKey) {
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.BUCKET_NAME!,
+              Key: currentImageKey,
+            })
+          );
+        }
+      }
+
+      // Read the file from the temporary path
+      const buffer = await fs.readFile(file.filepath);
+      const uniqueFileName = `${nanoid()}-${encodeURIComponent(
+        file.originalFilename || 'unnamed'
+      )}`;
+
+      // Upload new profile picture to R2
+      await r2.send(
+        new PutObjectCommand({
+          Bucket: process.env.BUCKET_NAME!,
+          Key: uniqueFileName,
+          Body: buffer,
+          ContentType: file.mimetype || 'application/octet-stream',
+        })
+      );
+
+      // Clean up the temporary file
+      await fs.unlink(file.filepath);
+
+      // Construct new profile picture URL
+      const profileUrl = `${process.env.PUBLIC_ACCESS_URL}/${uniqueFileName}`;
+
+      // Update the user record in the database
+      await db
+        .update(userTable)
+        .set({ avatar: profileUrl })
+        .where(eq(userTable.userId, authUser.userId))
+        .execute();
+
+      // Fetch updated user data
+      const updatedUser = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.userId, authUser.userId))
+        .limit(1);
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            updatedUser[0],
+            'Profile picture updated successfully'
+          )
+        );
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
     }
-
-    // Read the file from the temporary path
-    const buffer = await fs.readFile(file.filepath);
-    const uniqueFileName = `${nanoid()}-${encodeURIComponent(file.originalFilename || 'unnamed')}`;
-
-    // Upload new profile picture to R2
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: process.env.BUCKET_NAME!,
-        Key: uniqueFileName,
-        Body: buffer,
-        ContentType: file.mimetype || 'application/octet-stream',
-      })
-    );
-
-    // Clean up the temporary file
-    await fs.unlink(file.filepath);
-
-    // Construct new profile picture URL
-    const profileUrl = `${process.env.PUBLIC_ACCESS_URL}/${uniqueFileName}`;
-
-    // Update the user record in the database
-    await db
-      .update(userTable)
-      .set({ avatar: profileUrl })
-      .where(eq(userTable.userId, authUser.userId))
-      .execute();
-
-    // Fetch updated user data
-    const updatedUser = await db
-      .select()
-      .from(userTable)
-      .where(eq(userTable.userId, authUser.userId))
-      .limit(1);
-
-    return res.status(200).json(
-      new ApiResponse(200, updatedUser[0], 'Profile picture updated successfully')
-    );
-  } catch (error) {
-    console.error('Error updating profile picture:', error);
-    return res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
   }
-});
+);
 
 export const changePassword = asyncHandler(
   async (req: Request, res: Response) => {
@@ -390,7 +426,9 @@ export const changePassword = asyncHandler(
       // Ensure the authenticated user exists
       const authUser = req.user;
       if (!authUser) {
-        return res.status(401).json(new ApiResponse(401, {}, "Not authenticated"));
+        return res
+          .status(401)
+          .json(new ApiResponse(401, {}, 'Not authenticated'));
       }
 
       // Extract the fields from the request body
@@ -398,7 +436,15 @@ export const changePassword = asyncHandler(
 
       // Validate required fields
       if (!currentPassword || !newPassword) {
-        return res.status(400).json(new ApiResponse(400, {}, "Current password and new password are required"));
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(
+              400,
+              {},
+              'Current password and new password are required'
+            )
+          );
       }
 
       // Check if user exists and is verified
@@ -409,15 +455,24 @@ export const changePassword = asyncHandler(
         .limit(1);
 
       if (!user.length || !user[0].isVerified) {
-        return res.status(400).json(new ApiResponse(400, {}, "User does not exist or is not verified"));
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, {}, 'User does not exist or is not verified')
+          );
       }
 
       const existingUser = user[0];
 
       // Verify current password
-      const isMatch = await bcrypt.compare(currentPassword, existingUser.password);
+      const isMatch = await bcrypt.compare(
+        currentPassword,
+        existingUser.password
+      );
       if (!isMatch) {
-        return res.status(400).json(new ApiResponse(400, {}, "Current password is incorrect"));
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Current password is incorrect'));
       }
 
       // Hash the new password
@@ -429,10 +484,14 @@ export const changePassword = asyncHandler(
         .set({ password: hashedPassword })
         .where(eq(userTable.userId, authUser.userId));
 
-      return res.status(200).json(new ApiResponse(200, {}, "Password updated successfully"));
+      return res
+        .status(200)
+        .json(new ApiResponse(200, {}, 'Password updated successfully'));
     } catch (error) {
-      console.error("Error updating password:", error);
-      return res.status(500).json(new ApiResponse(500, {}, "Error updating password"));
+      console.error('Error updating password:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, {}, 'Error updating password'));
     }
   }
 );
@@ -443,10 +502,17 @@ export const resetPassword = asyncHandler(
       const { email, password } = req.body;
 
       // Validate required fields
-      if (!email || !password || email.trim() === "" || password.trim() === "") {
-        return res.status(400).json(
-          new ApiResponse(400, {}, "Email and new password are required")
-        );
+      if (
+        !email ||
+        !password ||
+        email.trim() === '' ||
+        password.trim() === ''
+      ) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, {}, 'Email and new password are required')
+          );
       }
 
       // Check if user exists and is verified
@@ -457,9 +523,9 @@ export const resetPassword = asyncHandler(
         .limit(1);
 
       if (!user.length || !user[0].isVerified) {
-        return res.status(404).json(
-          new ApiResponse(404, {}, "User not found or not verified")
-        );
+        return res
+          .status(404)
+          .json(new ApiResponse(404, {}, 'User not found or not verified'));
       }
 
       // Hash the new password
@@ -471,14 +537,14 @@ export const resetPassword = asyncHandler(
         .set({ password: hashedPassword })
         .where(eq(userTable.email, email));
 
-      return res.status(200).json(
-        new ApiResponse(200, {}, "Password reset successfully")
-      );
+      return res
+        .status(200)
+        .json(new ApiResponse(200, {}, 'Password reset successfully'));
     } catch (error) {
-      console.error("Error resetting password:", error);
-      return res.status(500).json(
-        new ApiResponse(500, {}, "Error resetting password")
-      );
+      console.error('Error resetting password:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, {}, 'Error resetting password'));
     }
   }
 );
@@ -489,15 +555,19 @@ export const updateUserProfile = asyncHandler(
       // Ensure the authenticated user exists
       const authUser = req.user;
       if (!authUser) {
-        return res.status(401).json(new ApiResponse(401, {}, "Not authenticated"));
+        return res
+          .status(401)
+          .json(new ApiResponse(401, {}, 'Not authenticated'));
       }
 
       // Extract the fields from the request body
       const { firstName, lastName } = req.body;
 
       // Validate required fields
-      if (!firstName || firstName.trim() === "") {
-        return res.status(400).json(new ApiResponse(400, {}, "First name is required"));
+      if (!firstName || firstName.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'First name is required'));
       }
 
       // Check if user exists and is verified
@@ -508,7 +578,11 @@ export const updateUserProfile = asyncHandler(
         .limit(1);
 
       if (!user.length || !user[0].isVerified) {
-        return res.status(400).json(new ApiResponse(400, {}, "User does not exist or is not verified"));
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, {}, 'User does not exist or is not verified')
+          );
       }
 
       // Prepare update data
@@ -516,7 +590,7 @@ export const updateUserProfile = asyncHandler(
         firstName: string;
         lastName?: string | null;
       } = {
-        firstName: firstName.trim()
+        firstName: firstName.trim(),
       };
 
       // Only include lastName in update if it's provided
@@ -541,13 +615,14 @@ export const updateUserProfile = asyncHandler(
             email: updatedUser.email,
             avatar: updatedUser.avatar,
           },
-          "Profile updated successfully"
+          'Profile updated successfully'
         )
       );
     } catch (error) {
-      console.error("Error updating profile:", error);
-      return res.status(500).json(new ApiResponse(500, {}, "Error updating profile"));
+      console.error('Error updating profile:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, {}, 'Error updating profile'));
     }
   }
 );
-

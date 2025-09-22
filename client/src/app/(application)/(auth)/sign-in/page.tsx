@@ -1,20 +1,6 @@
 "use client";
-import { EyeOff } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { loginSchema } from "@/schemas/auth-schema";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import axios, { AxiosError } from "axios";
-import { env } from "@/config/env";
-import { toast } from "sonner";
 import {
   Form,
   FormField,
@@ -22,10 +8,21 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import Image from "next/image";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Axios } from "@/config/axios";
+import { env } from "@/config/env";
+import { loginSchema } from "@/schemas/auth-schema";
 import useAuthStore from "@/store/store";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AxiosError } from "axios";
+import { EyeOff, Loader2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -176,7 +173,7 @@ export default function LoginPage() {
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
                   <Link
-                    href="/create-new-company"
+                    href="/sign-up"
                     className="underline underline-offset-4"
                   >
                     Register

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
   }
 
   // List of paths that do not require authentication
-  const publicPaths = ["/home", "/sign-in", "/signup", "/verify/:email", "/create-new-company"];
+  const publicPaths = ["/home", "/sign-in", "/sign-up", "/verify/:email", "/create-new-company"];
 
   // Auth-only paths (logged in users shouldn't access these)
   const authOnlyPaths = ["/sign-in", "/create-new-company"];
@@ -19,7 +19,7 @@ export function middleware(request: NextRequest) {
   const apiAuthPaths = ["/api/auth/", "/api/auth/**"];
 
   // Check for token in cookies with domain-aware handling
-  const token = request.cookies.get("accessToken")?.value || 
+  const token = request.cookies.get("accessToken")?.value ||
                 request.headers.get("Authorization")?.replace("Bearer ", "") || "";
 
   const response = NextResponse.next();
@@ -64,7 +64,7 @@ export function middleware(request: NextRequest) {
       });
       return redirectResponse;
     }
-    
+
     return response;
   }
 
