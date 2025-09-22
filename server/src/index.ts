@@ -17,12 +17,7 @@ app.use(cookieParser());
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://admin.taskforges.com',
-      'https://workspace.taskforges.com',
-    ],
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
   })
 );
