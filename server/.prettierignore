@@ -1,0 +1,35 @@
+# Prettier ignore file for server
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Cache directories
+.cache/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env*
+
+# Generated files
+*.generated.*
+drizzle/
+
+# Lock files (keep formatting consistent)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

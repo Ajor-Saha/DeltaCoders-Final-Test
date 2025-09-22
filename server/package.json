@@ -1,0 +1,51 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "backend ",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --import=tsx --watch src/index.ts",
+    "start": "node --import=tsx src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:push": "drizzle-kit push"
+  },
+  "author": "Ajor",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.775.0",
+    "@google/genai": "^1.4.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.39.3",
+    "express": "^4.21.2",
+    "formidable": "^3.5.2",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "nanoid": "^5.1.5",
+    "nodemailer": "^6.10.0",
+    "nodemon": "^3.1.10",
+    "pg": "^8.13.3",
+    "socket.io": "^4.8.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/formidable": "^3.4.5",
+    "@types/jsonwebtoken": "^9.0.8",
+    "@types/morgan": "^1.9.9",
+    "@types/nodemailer": "^6.4.17",
+    "drizzle-kit": "^0.31.1",
+    "typescript": "^5.7.3"
+  }
+}
