@@ -3,6 +3,7 @@ import {
   integer,
   pgTable,
   serial,
+  text,
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -13,7 +14,7 @@ export const userQuizProgressTable = pgTable(
   'user_quiz_progress',
   {
     progressId: serial('progress_id').primaryKey(),
-    userId: integer('user_id')
+    userId: text('user_id')
       .notNull()
       .references(() => userTable.userId, { onDelete: 'cascade' }),
     quizId: integer('quiz_id')

@@ -6,15 +6,10 @@ import {
   serial,
   text,
 } from 'drizzle-orm/pg-core';
-import { quizzesTable } from './tbl-quizzes';
+import { difficultyLevelEnum, quizzesTable } from './tbl-quizzes';
 
 // Enum for question type
-export const questionTypeEnum = pgEnum('question_type', [
-  'mcq',
-  'short_answer',
-  'flash_card',
-  'true_false',
-]);
+export const questionTypeEnum = pgEnum('question_type', ['mcq', 'true_false']);
 
 export const questionsTable = pgTable('questions', {
   questionId: serial('question_id').primaryKey(),
@@ -26,5 +21,6 @@ export const questionsTable = pgTable('questions', {
   options: json('options'), // Store options as JSON for MCQ, flash cards, etc.
   correctAnswer: text('correct_answer').notNull(), // For direct answers or correct option reference
   explanation: text('explanation'), // Optional explanation
-  points: integer('points').default(1),
+  difficultyLevel: difficultyLevelEnum('difficulty_level').default('easy'),
+  topicFocus: text('topic_focus'), // Specific topic within the subject
 });

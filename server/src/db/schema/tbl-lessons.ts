@@ -8,6 +8,5 @@ export const lessonsTable = pgTable('lessons', {
     .references(() => topicsTable.topicId, { onDelete: 'cascade' }),
   lessonTitle: varchar('lesson_title', { length: 200 }).notNull(),
   content: text('content'),
-  lessonDuration: integer('lesson_duration'), // in minutes
-  orderSequence: integer('order_sequence').default(1),
+  orderSequence: integer('order_sequence').default(1), // Changed from serial to integer with default
 });

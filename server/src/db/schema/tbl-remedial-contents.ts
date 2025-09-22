@@ -5,9 +5,8 @@ import {
   serial,
   text,
   timestamp,
-  varchar,
 } from 'drizzle-orm/pg-core';
-import { remedialQuestionsTable } from './tbl-remedial-questions';
+import { subjectsTable } from './tbl-subjects';
 import { userTable } from './tbl-user';
 
 // Enum for content type
@@ -19,17 +18,13 @@ export const contentTypeEnum = pgEnum('content_type', [
 
 export const remedialContentsTable = pgTable('remedial_contents', {
   contentId: serial('content_id').primaryKey(),
-  userId: integer('user_id')
+  userId: text('user_id')
     .notNull()
     .references(() => userTable.userId, { onDelete: 'cascade' }),
-  remedialQuestionId: integer('remedial_question_id')
+  subjectId: integer('subject_id')
     .notNull()
-    .references(() => remedialQuestionsTable.remedialQuestionId, {
-      onDelete: 'cascade',
-    }),
-  contentType: contentTypeEnum('content_type').notNull(),
-  contentUrl: text('content_url').notNull(),
-  title: varchar('title', { length: 200 }).notNull(),
-  duration: integer('duration'), // in minutes
-  assignedAt: timestamp('assigned_at').defaultNow(),
+    .references(() => subjectsTable.subjectId, { onDelete: 'cascade' }),
+  weaknessTopic: text('weakness_topic').notNull(), // topic of weakness
+  content: text('content').notNull(), //generated remedial content
+  createdAt: timestamp('created_at').defaultNow(),
 });
