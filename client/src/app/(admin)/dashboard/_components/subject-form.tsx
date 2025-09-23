@@ -11,13 +11,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Axios } from "@/config/axios";
 import { getFilteredSubjects } from "@/constants/subjectlist";
+import useAuthStore from "@/store/store";
 import { BookOpen, Check, Send, Target } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface SubjectFormData {
   subject: string;
   skillLevel: string;
+}
+
+interface SubjectFormProps {
+  onSuccess?: () => void;
 }
 
 const skillLevels = [
@@ -26,7 +33,7 @@ const skillLevels = [
   { value: "advanced", label: "Advanced", description: "Experienced" },
 ];
 
-export function SubjectForm() {
+export function SubjectForm({ onSuccess }: SubjectFormProps) {
   const [formData, setFormData] = useState<SubjectFormData>({
     subject: "",
     skillLevel: "",
@@ -39,31 +46,84 @@ export function SubjectForm() {
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // Get authentication state
+  const { isAuthenticated, user, accessToken } = useAuthStore();
+
+  // Log token for debugging
+  console.log("🔐 JWT Token:", accessToken);
+  console.log("👤 User:", user);
+  console.log("✅ Is Authenticated:", isAuthenticated);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Check authentication
+    if (!isAuthenticated || !user) {
+      toast.error("Please log in to add subjects");
+      return;
+    }
+
     // Basic validation
     if (!formData.subject.trim() || !formData.skillLevel) {
-      alert("Please fill in all fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual API call in next prompt
-      console.log("Form submitted:", formData);
+      // Call the actual backend API
+      const response = await Axios.post('/api/subject/add-subject', {
+        subjectName: formData.subject.trim(),
+        level: formData.skillLevel
+      }, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Success handling
+      if (response.status === 200 || response.status === 201) {
+        // Reset form after successful submission
+        setFormData({ subject: "", skillLevel: "" });
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setSelectedSuggestionIndex(-1);
 
-      // Reset form after successful submission
-      setFormData({ subject: "", skillLevel: "" });
-      alert("Subject submitted successfully!");
+        toast.success("Subject added successfully! 🎉", {
+          description: `${formData.subject} (${formData.skillLevel}) has been added to your learning list.`
+        });
 
-    } catch (error) {
+        // Call onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess();
+        }
+
+        console.log("Subject added successfully:", response.data);
+      }
+
+    } catch (error: any) {
       console.error("Error submitting form:", error);
-      alert("Error submitting form. Please try again.");
+
+      // Handle different types of errors
+      if (error.response?.status === 401) {
+        toast.error("Authentication failed", {
+          description: "Please log in again to continue."
+        });
+      } else if (error.response?.status === 400) {
+        const errorMessage = error.response?.data?.message || "Invalid input data";
+        toast.error("Validation Error", {
+          description: errorMessage
+        });
+      } else if (error.response?.status === 409) {
+        toast.error("Subject already exists", {
+          description: "You have already added this subject to your learning list."
+        });
+      } else {
+        toast.error("Failed to add subject", {
+          description: "Please check your connection and try again."
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -144,6 +204,33 @@ export function SubjectForm() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Show authentication message if user is not logged in
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px] p-4">
+        <Card className="w-full max-w-md shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+          <CardContent className="p-8 text-center">
+            <div className="mx-auto mb-4 w-16 h-16 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
+              Authentication Required
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Please log in to add subjects to your learning list.
+            </p>
+            <Button
+              onClick={() => window.location.href = '/sign-in'}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Go to Sign In
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-center items-center min-h-[400px] p-4">

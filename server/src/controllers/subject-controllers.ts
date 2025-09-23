@@ -153,6 +153,8 @@ export const getUserSubjects = asyncHandler(
       const userSubjects = await db
         .select({
           id: userSubjectsTable.id,
+          userId: userSubjectsTable.userId,
+          subjectId: userSubjectsTable.subjectId,
           level: userSubjectsTable.level,
           createdAt: userSubjectsTable.createdAt,
           updatedAt: userSubjectsTable.updatedAt,
@@ -173,7 +175,7 @@ export const getUserSubjects = asyncHandler(
         .json(
           new ApiResponse(
             200,
-            { userSubjects, totalSubjects: userSubjects.length },
+            userSubjects,
             'User subjects retrieved successfully'
           )
         );

@@ -1,21 +1,5 @@
 "use client";
 
-import type * as React from "react";
-import {
-  Building2,
-  FolderKanban,
-  GalleryVerticalEnd,
-  KeyRound,
-  LayoutDashboard,
-  LayoutGrid,
-  List,
-  Minus,
-  Plus,
-  PlusCircle,
-  SettingsIcon,
-  UserCog,
-  Users,
-} from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,33 +19,54 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { NavUser } from "./nav-user";
-import { usePathname, useRouter } from "next/navigation";
-import useAuthStore from "@/store/store";
 import { Axios } from "@/config/axios";
 import { env } from "@/config/env";
+import useAuthStore from "@/store/store";
+import {
+  Building2,
+  FolderKanban,
+  GalleryVerticalEnd,
+  KeyRound,
+  LayoutDashboard,
+  LayoutGrid,
+  List,
+  Minus,
+  Plus,
+  PlusCircle,
+  SettingsIcon,
+  UserCog,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import type * as React from "react";
+import { NavUser } from "./nav-user";
 
 // Sidebar Data
 const sidebarData = {
   navMain: [
     {
-      title: "Project",
-      url: "/project",
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: <LayoutDashboard size={20} />,
+    },
+    {
+      title: "Subject",
+      url: "/dashboard/subjects",
       icon: <FolderKanban size={20} />,
       items: [
         {
-          title: "Add Project",
-          url: "/project/add-project",
+          title: "Add Subject",
+          url: "/dashboard/subjects",
           icon: <PlusCircle size={16} />,
         },
         {
-          title: "All Project",
-          url: "/project/all-project",
+          title: "All Subjects",
+          url: "/dashboard/subjects",
           icon: <List size={16} />,
         },
         {
-          title: "Manage Project",
+          title: "Manage Subject",
           url: "/project/manage-project",
           icon: <LayoutGrid size={16} />,
         },
@@ -136,8 +141,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   return (
-    <Sidebar {...props} 
-    className="[&>[data-sidebar=sidebar]]:bg-slate-100 
+    <Sidebar {...props}
+    className="[&>[data-sidebar=sidebar]]:bg-slate-100
     dark:[&>[data-sidebar=sidebar]]:bg-[#191919]
     [&>[data-sidebar=sidebar]]:text-gray-800
     dark:[&>[data-sidebar=sidebar]]:text-white"
