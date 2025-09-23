@@ -1,5 +1,19 @@
-CREATE TYPE "public"."topic_difficulty" AS ENUM('easy', 'medium', 'hard');--> statement-breakpoint
+CREATE TYPE "public"."topic_difficulty" AS ENUM('Easy', 'Medium', 'Hard');--> statement-breakpoint
 CREATE TYPE "public"."user_level" AS ENUM('beginner', 'intermediate', 'advanced');--> statement-breakpoint
+CREATE TABLE "external_resources" (
+	"resource_id" text PRIMARY KEY NOT NULL,
+	"subject_id" text NOT NULL,
+	"topic_name" varchar(255) NOT NULL,
+	"description" text,
+	"resource_title" varchar(500) NOT NULL,
+	"url" text NOT NULL,
+	"type" varchar(255),
+	"source" varchar(255),
+	"difficulty" varchar(50),
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT current_timestamp
+);
+--> statement-breakpoint
 CREATE TABLE "lessons" (
 	"lesson_id" text PRIMARY KEY NOT NULL,
 	"topic_id" text NOT NULL,
@@ -28,6 +42,7 @@ CREATE TABLE "quiz_results" (
 	"quiz_id" text NOT NULL,
 	"score" integer NOT NULL,
 	"total_marks" integer NOT NULL,
+	"time_taken" integer NOT NULL,
 	"summary" text,
 	"completed_at" timestamp DEFAULT now() NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
@@ -83,7 +98,7 @@ CREATE TABLE "topics" (
 	"subject_id" text NOT NULL,
 	"title" varchar(255) NOT NULL,
 	"description" text,
-	"difficulty" "topic_difficulty" DEFAULT 'easy',
+	"difficulty" "topic_difficulty" DEFAULT 'Easy',
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT current_timestamp
 );
@@ -112,6 +127,7 @@ CREATE TABLE "user_subjects" (
 	"updated_at" timestamp DEFAULT current_timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "external_resources" ADD CONSTRAINT "external_resources_subject_id_subjects_subject_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subjects"("subject_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lessons" ADD CONSTRAINT "lessons_topic_id_topics_topic_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."topics"("topic_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quiz_questions" ADD CONSTRAINT "quiz_questions_quiz_id_quizzes_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quizzes"("quiz_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quiz_results" ADD CONSTRAINT "quiz_results_quiz_id_quizzes_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quizzes"("quiz_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
