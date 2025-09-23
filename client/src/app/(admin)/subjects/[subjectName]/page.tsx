@@ -9,6 +9,7 @@ import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
   ArrowLeft,
+  Bookmark,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -25,6 +26,8 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { QuizMaker } from "../_components/quiz-maker";
+import { Resources } from "../_components/resources";
+import { ShortQuestions } from "../_components/short-questions";
 
 interface Topic {
   topicId: string;
@@ -54,7 +57,7 @@ export default function SubjectDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [selectedContent, setSelectedContent] = useState<{
-    type: 'overview' | 'learnings' | 'lessons' | 'quiz';
+    type: 'overview' | 'learnings' | 'lessons' | 'quiz' | 'short-questions' | 'resources';
     topicId?: string;
     topic?: Topic;
   }>({ type: 'overview' });
@@ -368,7 +371,7 @@ export default function SubjectDetailPage() {
           <p className="text-gray-500 dark:text-gray-400 mb-4">
             The subject you're looking for doesn't exist or you don't have access to it.
           </p>
-          <Link href="/dashboard/subjects">
+          <Link href="/subjects">
             <Button variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Subjects
@@ -385,7 +388,7 @@ export default function SubjectDetailPage() {
       <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <Link href="/dashboard/subjects">
+          <Link href="/subjects">
             <Button variant="ghost" size="sm" className="mb-4 p-0">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Subjects
@@ -421,6 +424,36 @@ export default function SubjectDetailPage() {
               <div className="flex items-center gap-2">
                 <Target className="w-4 h-4" />
                 <span className="font-medium">Course Overview</span>
+              </div>
+            </button>
+
+            {/* Short Questions */}
+            <button
+              onClick={() => setSelectedContent({ type: 'short-questions' })}
+              className={`w-full text-left p-3 rounded-lg transition-colors ${
+                selectedContent.type === 'short-questions'
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4" />
+                <span className="font-medium">Short Questions</span>
+              </div>
+            </button>
+
+            {/* Resources */}
+            <button
+              onClick={() => setSelectedContent({ type: 'resources' })}
+              className={`w-full text-left p-3 rounded-lg transition-colors ${
+                selectedContent.type === 'resources'
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4" />
+                <span className="font-medium">Resources</span>
               </div>
             </button>
 
@@ -810,6 +843,24 @@ export default function SubjectDetailPage() {
                        // Reset quiz data to show selection interface again
                        setQuizData(null);
                      }}
+                   />
+                 )}
+
+                 {selectedContent.type === 'short-questions' && (
+                   <ShortQuestions
+                     topicId={selectedContent.topicId}
+                     topic={selectedContent.topic}
+                     subjectId={subjectDetail.subjectId}
+                     subjectName={subjectDetail.subjectName}
+                   />
+                 )}
+
+                 {selectedContent.type === 'resources' && (
+                   <Resources
+                     topicId={selectedContent.topicId}
+                     topic={selectedContent.topic}
+                     subjectId={subjectDetail.subjectId}
+                     subjectName={subjectDetail.subjectName}
                    />
                  )}
               </CardContent>
