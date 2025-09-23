@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState } from "react";
+import { SubjectForm } from "./_components/subject-form";
 
 
 
 export default function DashboardClient() {
   const [timeframe, setTimeframe] = useState("last-year");
- 
 
-  
+
+
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -22,8 +23,10 @@ export default function DashboardClient() {
             <p className="text-center text-gray-600">Timeframe: {timeframe}</p>
           </div>
 
-          
-          
+          {/* Subject Learning Form */}
+          <div className="w-full">
+            <SubjectForm />
+          </div>
         </div>
       </main>
     </div>
