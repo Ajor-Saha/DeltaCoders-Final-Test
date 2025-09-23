@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Axios } from "@/config/axios";
 import useAuthStore from "@/store/store";
 import { BookOpen, Calendar, Plus, TrendingUp, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SubjectForm } from "../_components/subject-form";
@@ -40,6 +41,12 @@ export default function SubjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const { isAuthenticated, user, accessToken } = useAuthStore();
+  const router = useRouter();
+
+  const handleSubjectClick = (subjectName: string) => {
+    const encodedName = subjectName.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/dashboard/subjects/${encodedName}`);
+  };
 
   const fetchUserSubjects = async () => {
     if (!isAuthenticated || !accessToken) return;
@@ -174,7 +181,8 @@ export default function SubjectsPage() {
               {subjects.map((userSubject) => (
                 <Card
                   key={userSubject.id}
-                  className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 hover:scale-[1.02]"
+                  className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 hover:scale-[1.02] cursor-pointer"
+                  onClick={() => handleSubjectClick(userSubject.subject.subjectName)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
