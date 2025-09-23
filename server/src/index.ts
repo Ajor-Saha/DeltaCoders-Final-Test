@@ -32,16 +32,12 @@ app.use('/api/auth', user_router);
 app.use('/api/subject', subject_router);
 // Mount topic router
 app.use('/api/topic', topic_router);
-// Mount question router
-<<<<<<< Updated upstream
+// Mount short question router
 app.use('/api', question_router);
 /// Mount resource route
 app.use('/api/resource', resource_router);
-=======
-app.use('/api/question', question_router);
 // Mount cognitive assessment router
 app.use('/api/cognitive-assessment', cognitive_assessment_router);
->>>>>>> Stashed changes
 
 app.get('/', (req, res) => {
   res.send('Company & task server is running');
