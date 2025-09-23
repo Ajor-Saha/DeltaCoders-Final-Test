@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
 import { subjectsTable } from '../db/schema/tbl-subjects';
+import { topicsTable } from '../db/schema/tbl-topics';
 import { userSubjectsTable } from '../db/schema/tbl-user-subjects';
 import { ApiResponse } from '../utils/api-response';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -368,6 +369,71 @@ export const getAllSubjects = asyncHandler(
         );
     } catch (error) {
       console.error('Error retrieving subjects:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+export const getSubjectById = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { subjectId } = req.params;
+
+      // Validate subjectId
+      if (!subjectId || subjectId.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Subject ID is required'));
+      }
+
+      // Get subject by ID with topics (title and description)
+      const subjectWithTopics = await db
+        .select({
+          subjectId: subjectsTable.subjectId,
+          subjectName: subjectsTable.subjectName,
+          createdAt: subjectsTable.createdAt,
+          updatedAt: subjectsTable.updatedAt,
+          topics: {
+            topicId: topicsTable.topicId,
+            title: topicsTable.title,
+            description: topicsTable.description,
+            difficulty: topicsTable.difficulty,
+          }
+        })
+        .from(subjectsTable)
+        .leftJoin(topicsTable, eq(subjectsTable.subjectId, topicsTable.subjectId))
+        .where(eq(subjectsTable.subjectId, subjectId));
+
+      if (subjectWithTopics.length === 0) {
+        return res
+          .status(404)
+          .json(new ApiResponse(404, {}, 'Subject not found'));
+      }
+
+      // Group topics by subject
+      const subject = {
+        subjectId: subjectWithTopics[0].subjectId,
+        subjectName: subjectWithTopics[0].subjectName,
+        createdAt: subjectWithTopics[0].createdAt,
+        updatedAt: subjectWithTopics[0].updatedAt,
+        topics: subjectWithTopics
+          .filter(row => row.topics && row.topics.topicId)
+          .map(row => row.topics)
+      };
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            subject,
+            'Subject details with topics retrieved successfully'
+          )
+        );
+    } catch (error) {
+      console.error('Error retrieving subject:', error);
       return res
         .status(500)
         .json(new ApiResponse(500, null, 'Internal server error'));
