@@ -23,6 +23,7 @@ import { Axios } from "@/config/axios";
 import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
+  BookOpen,
   Bot,
   Building2,
   FolderKanban,
@@ -48,6 +49,11 @@ const sidebarData = {
       title: "StarterFeed",
       url: "/starter-feed",
       icon: <GalleryVerticalEnd size={20} />,
+    },
+    {
+      title: "Courses",
+      url: "/courses",
+      icon: <BookOpen size={20} />,
     },
 
     {
