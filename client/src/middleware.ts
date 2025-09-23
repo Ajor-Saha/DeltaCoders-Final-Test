@@ -10,13 +10,15 @@ export function middleware(request: NextRequest) {
   }
 
   // List of paths that do not require authentication
-  const publicPaths = ["/home", "/sign-in", "/sign-up", "/verify/:email", "/create-new-company"];
+  const publicPaths = ["/home", "/sign-in", "/sign-up", "/verify/:email", "/create-new-company", "/starter-feed"];
 
   // Auth-only paths (logged in users shouldn't access these)
   const authOnlyPaths = ["/sign-in", "/create-new-company"];
 
   // Allow API authentication endpoints without session validation
   const apiAuthPaths = ["/api/auth/", "/api/auth/**"];
+  // Public API endpoints (no auth required)
+  const apiPublicPaths = ["/api/topic/starter-feed"];
 
   // Check for token in cookies with domain-aware handling
   const token = request.cookies.get("accessToken")?.value ||
@@ -47,10 +49,11 @@ export function middleware(request: NextRequest) {
     return regex.test(pathname);
   });
 
-  // For public paths or API auth paths, allow access without token validation
+  // For public paths or API auth/public paths, allow access without token validation
   if (
     isPublicPath ||
-    apiAuthPaths.some((path) => pathname.startsWith(path.replace("**", "")))
+    apiAuthPaths.some((path) => pathname.startsWith(path.replace("**", ""))) ||
+    apiPublicPaths.some((path) => pathname.startsWith(path))
   ) {
     // If user is authenticated and trying to access auth-only pages, redirect to home
     if (

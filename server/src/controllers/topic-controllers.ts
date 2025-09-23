@@ -1126,6 +1126,36 @@ Structure the response as a comprehensive JSON with the subject and all its topi
   }
 );
 
+export const getStarterFeed = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      // Fetch latest 15 external resources and join subject name
+      const resources = await db
+        .select({
+          resourceId: externalResourcesTable.resourceId,
+          subjectId: externalResourcesTable.subjectId,
+          topicName: externalResourcesTable.topicName,
+          description: externalResourcesTable.description,
+          resourceTitle: externalResourcesTable.resourceTitle,
+          url: externalResourcesTable.url,
+          createdAt: externalResourcesTable.createdAt,
+        })
+        .from(externalResourcesTable)
+        .orderBy(externalResourcesTable.createdAt)
+        .limit(15);
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, resources, 'Starter feed fetched successfully'));
+    } catch (error) {
+      console.error('Error fetching starter feed:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
 export const generateShortQuestions = asyncHandler(
   async (req: Request, res: Response) => {
     try {

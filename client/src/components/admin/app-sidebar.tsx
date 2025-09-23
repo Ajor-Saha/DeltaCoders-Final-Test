@@ -28,14 +28,13 @@ import {
   FolderKanban,
   GalleryVerticalEnd,
   KeyRound,
-  LayoutDashboard,
   LayoutGrid,
   List,
   Minus,
   Plus,
   PlusCircle,
   SettingsIcon,
-  UserCog,
+  UserCog
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -45,6 +44,11 @@ import { NavUser } from "./nav-user";
 // Sidebar Data
 const sidebarData = {
   navMain: [
+    {
+      title: "StarterFeed",
+      url: "/starter-feed",
+      icon: <GalleryVerticalEnd size={20} />,
+    },
 
     {
       title: "Subject",
@@ -146,11 +150,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <SidebarGroup>
           <Link
-            href="/dashboard"
+            href="/starter-feed"
             className="text-sm px-2 py-2 flex items-center gap-2 dark:bg-[#191919] dark:hover:bg-gray-800"
           >
-            <LayoutDashboard size={18} />
-            <span>Dashboard</span>
+            <GalleryVerticalEnd size={18} />
+            <span>StarterFeed</span>
           </Link>
         </SidebarGroup>
         <SidebarGroup>

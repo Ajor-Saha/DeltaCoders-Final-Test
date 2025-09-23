@@ -95,9 +95,9 @@ function Header() {
              {/* <a href="#dashboard" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
              Dashboard
             </a> */}
-            <a href="#projects" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Projects
-            </a>
+            <Link href="/starter-feed" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              StarterFeed
+            </Link>
             <a href="#employee" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Employee
             </a>
@@ -186,13 +186,13 @@ function Header() {
       {isOpen && (
         <div className="md:hidden bg-teal-400 dark:bg-teal-800 mt-5 p-3 sm:p-4 space-y-1 sm:space-y-2 fixed top-[60px] sm:top-[70px] md:top-[80px] left-0 right-0 z-40 w-screen overflow-y-auto max-h-[calc(100vh-60px)] sm:max-h-[calc(100vh-70px)] md:max-h-[calc(100vh-80px)]">
           <div className="max-w-7xl mx-auto px-2 sm:px-4 font-semibold">
-            <a
-              href="#projects"
+            <Link
+              href="/starter-feed"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
               onClick={closeMenu}
             >
-              Projects
-            </a>
+              StarterFeed
+            </Link>
             <a
               href="#employee"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"

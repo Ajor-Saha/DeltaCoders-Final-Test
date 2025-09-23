@@ -5,10 +5,10 @@ import {
   createQuiz,
   generateLearningContent,
   generateQuiz,
-  generateShortQuestions,
   getExternalResources,
   getQuizById,
   getQuizzesByTopic,
+  getStarterFeed
 } from '../controllers/topic-controllers';
 import { verifyJWT } from '../middleware/auth-middleware';
 
@@ -18,7 +18,9 @@ topic_router.route('/generate-topic').post(createAllTopics);
 topic_router.route('/generate-content').post(generateLearningContent);
 topic_router.route('/generate-quiz').post(verifyJWT, generateQuiz);
 topic_router.route('/external-resources').post(getExternalResources);
-topic_router.route('/generate-short-questions').post(generateShortQuestions);
+
+topic_router.route('/starter-feed').get(getStarterFeed);
+
 topic_router.route('/create-quiz').post(verifyJWT, createQuiz);
 topic_router.route('/submit-quiz').post(verifyJWT, submitQuiz);
 topic_router.route('/quizzes/:topicId').get(verifyJWT, getQuizzesByTopic);
