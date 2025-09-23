@@ -6,7 +6,6 @@ import {
   generateLearningContent,
   generateQuiz,
   generateShortQuestions,
-  getExternalResources,
   getQuizById,
   getQuizzesByTopic,
   getStarterFeed,
@@ -20,7 +19,6 @@ topic_router.use(verifyJWT);
 topic_router.route('/generate-topic').post(createAllTopics);
 topic_router.route('/generate-content').post(generateLearningContent);
 topic_router.route('/generate-quiz').post(generateQuiz);
-topic_router.route('/external-resources').post(getExternalResources);
 
 topic_router.route('/starter-feed').get(getStarterFeed);
 topic_router.route('/generate-short-questions').post(generateShortQuestions);
