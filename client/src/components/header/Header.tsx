@@ -98,9 +98,9 @@ function Header() {
             <Link href="/starter-feed" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               StarterFeed
             </Link>
-            <a href="#employee" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Employee
-            </a>
+            <Link href="/courses" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              Courses
+            </Link>
             <a href="#stats" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Stats
             </a>
@@ -193,13 +193,13 @@ function Header() {
             >
               StarterFeed
             </Link>
-            <a
-              href="#employee"
+            <Link
+              href="/courses"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
               onClick={closeMenu}
             >
-              Employee
-            </a>
+              Courses
+            </Link>
             <a
               href="#stats"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
