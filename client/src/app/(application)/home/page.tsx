@@ -1,11 +1,9 @@
 "use client";
 // import { Logo } from '@/components/logo'
-import Link from "next/link";
+import FloatingChatbot from "@/components/chatbot/FloatingChatbot";
+import HeroSection from "@/components/company_management_hero_section/hero";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import { InfiniteSlider } from "@/components/ui/InfiniteSlider";
-import { ProgressiveBlur } from "@/components/ui/progressive-blur";
-import { Check, Cpu, Lock, Sparkles, Zap } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -14,10 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import HeroSection from "@/components/company_management_hero_section/hero";
+import { InfiniteSlider } from "@/components/ui/InfiniteSlider";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
+import { Check, Cpu, Lock, Sparkles, Zap } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 export default function PageLandingSection() {
   const members = [
     {
@@ -700,6 +699,9 @@ export default function PageLandingSection() {
           </div>
         </section>
       </main>
+
+      {/* Floating Chatbot */}
+      <FloatingChatbot />
     </>
   );
 }
