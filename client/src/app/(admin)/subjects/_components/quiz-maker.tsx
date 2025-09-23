@@ -500,7 +500,10 @@ export function QuizMaker({
               {quizState.weaknesses && quizState.weaknesses.length > 0 && (
                 <Button
                   onClick={() => {
-                    setQuizState(prev => ({ ...prev, showResults: false, showQuizList: false }));
+                    setQuizState(prev => ({ ...prev, showResults: false, showQuizList: false,
+                    currentQuestion: 0,
+                    quizStarted: false,
+                     }));
                     generateNewQuiz(true);
                   }}
                   variant="default"
