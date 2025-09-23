@@ -52,22 +52,22 @@ const sidebarData = {
     },
     {
       title: "Subject",
-      url: "/dashboard/subjects",
+      url: "/subjects",
       icon: <FolderKanban size={20} />,
       items: [
         {
           title: "Add Subject",
-          url: "/dashboard/subjects",
+          url: "/subjects",
           icon: <PlusCircle size={16} />,
         },
         {
           title: "All Subjects",
-          url: "/dashboard/subjects",
+          url: "/subjects",
           icon: <List size={16} />,
         },
         {
           title: "Manage Subject",
-          url: "/project/manage-project",
+          url: "/subjects/manage-subject",
           icon: <LayoutGrid size={16} />,
         },
       ],

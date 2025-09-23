@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SubjectForm } from "./_components/subject-form";
+import { SubjectForm } from "../subjects/_components/subject-form";
 
 
 

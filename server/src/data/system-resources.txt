@@ -1,0 +1,27 @@
+# Smart Study Application User Guide
+
+## Overview
+Smart Study is an intelligent learning platform designed to help users master any subject by providing AI-powered study materials, personalized learning paths, and comprehensive assessments. The application acts as a personal tutor, generating dynamic content and quizzes to make learning more efficient and engaging.
+
+## Getting Started: Your Learning Journey
+1.  **Sign Up & Sign In**: New users can create an account to get started. Existing users can sign in to access their personalized dashboard and continue their learning journey right where they left off.
+
+## Core Features: How It Works
+
+### 1. Subject & Topic Exploration
+-   **Choose Your Subjects**: After logging in, you can select from a list of existing subjects or add new ones you want to master. This customizes your learning dashboard.
+-   **Discover Topics**: Within each subject, the application automatically generates a comprehensive list of topics, categorized by difficulty (Beginner, Intermediate, Advanced). This gives you a clear roadmap of what you need to learn.
+
+### 2. AI-Powered Learning Content
+-   **Generate Lessons**: For any topic you choose, you can instantly generate a detailed lesson. The AI creates well-structured, easy-to-understand learning material from scratch, allowing you to dive deep into the concept. The content is streamed to you in real-time.
+-   **Find External Resources**: To broaden your understanding, the application can find relevant external learning materials for any subject. It searches the web and provides a curated list of high-quality articles, videos, and courses from reputable sources, categorized by topic and difficulty.
+
+### 3. Intelligent Assessments & Quizzes
+-   **Topic Quizzes**: After studying a topic, you can test your knowledge by generating a quiz. The AI creates a set of multiple-choice questions complete with options and correct answers to help you solidify what you've learned.
+-   **Short Question Exams**: To review an entire subject, you can request a "Short Question Exam." The application gathers all the topics within that subject and generates a comprehensive exam with short-answer questions, providing a thorough test of your overall knowledge.
+
+## Your Personalized Learning Experience
+The application adapts to your needs. By categorizing topics and resources by difficulty, it allows you to start with the basics and progressively move to more advanced concepts. This structured approach ensures you build a solid foundation of knowledge.
+
+## Goal
+The ultimate goal of the Smart Study application is to provide a seamless, all-in-one learning environment. It removes the friction of searching for study materials and creating practice tests, allowing you to focus purely on learning and mastering your chosen subjects.

@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import axios from 'axios';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
@@ -182,6 +182,78 @@ export const generateLearningContent = asyncHandler(
       if (existingTopic.length > 0) {
         validatedTopicId = existingTopic[0].topics.topicId;
         console.log('Found existing topic with ID:', validatedTopicId);
+
+        // Check if content already exists for this topic
+        const existingLesson = await db
+          .select()
+          .from(lessonsTable)
+          .where(eq(lessonsTable.topicId, validatedTopicId))
+          .limit(1);
+
+        if (existingLesson.length > 0) {
+          console.log(
+            'Found existing content for topic, returning cached version'
+          );
+
+          // Set up streaming response headers
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+
+          // Send initial metadata
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'start',
+              topicId: validatedTopicId,
+              topicLinked: true,
+              subject: subject,
+              topic: topic,
+              message: 'Found existing content, loading...',
+              cached: true,
+            })}\n\n`
+          );
+
+          // Send the existing content in chunks to simulate streaming
+          const existingContent = existingLesson[0].content || '';
+          const chunkSize = 100; // Characters per chunk
+
+          for (let i = 0; i < existingContent.length; i += chunkSize) {
+            const chunk = existingContent.slice(i, i + chunkSize);
+            res.write(
+              `data: ${JSON.stringify({
+                type: 'content',
+                content: chunk,
+              })}\n\n`
+            );
+            // Small delay to simulate streaming
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+
+          // Send final metadata
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'metadata',
+              lessonId: existingLesson[0].lessonId,
+              topicId: validatedTopicId,
+              topicLinked: true,
+              savedToDatabase: true,
+              contentLength: existingContent.length,
+              createdAt: existingLesson[0].createdAt,
+              cached: true,
+            })}\n\n`
+          );
+
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'complete',
+              message: 'Content loaded from database (cached version)',
+              cached: true,
+            })}\n\n`
+          );
+
+          res.end();
+          return;
+        }
       } else {
         console.log(
           'No existing topic found for:',
@@ -1240,6 +1312,151 @@ export const createQuiz = asyncHandler(async (req: Request, res: Response) => {
       .json(new ApiResponse(200, savedQuiz[0], 'Quiz created successfully'));
   } catch (error) {
     console.error('Error creating quiz:', error);
+    res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
+  }
+});
+
+export const getQuizzesByTopic = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { topicId } = req.params;
+      const userId = req.user.userId;
+
+      if (!topicId) {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Topic ID is required'));
+      }
+
+      // Get all quizzes for this topic and user
+      const quizzes = await db
+        .select({
+          quizId: quizzesTable.quizId,
+          topicId: quizzesTable.topicId,
+          attemptCount: quizzesTable.attemptCount,
+          createdAt: quizzesTable.createdAt,
+        })
+        .from(quizzesTable)
+        .where(
+          and(
+            eq(quizzesTable.topicId, topicId),
+            eq(quizzesTable.userId, userId)
+          )
+        )
+        .orderBy(quizzesTable.createdAt);
+
+      // Get question count for each quiz
+      const quizzesWithDetails = [];
+      for (const quiz of quizzes) {
+        const questions = await db
+          .select()
+          .from(quizQuestionsTable)
+          .where(eq(quizQuestionsTable.quizId, quiz.quizId));
+
+        quizzesWithDetails.push({
+          ...quiz,
+          questionCount: questions.length,
+        });
+      }
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            quizzesWithDetails,
+            'Quizzes fetched successfully'
+          )
+        );
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+      res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+export const getQuizById = asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.user.userId;
+
+    if (!quizId) {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, {}, 'Quiz ID is required'));
+    }
+
+    // Get quiz details
+    const quiz = await db
+      .select()
+      .from(quizzesTable)
+      .innerJoin(
+        subjectsTable,
+        eq(quizzesTable.subjectId, subjectsTable.subjectId)
+      )
+      .leftJoin(topicsTable, eq(quizzesTable.topicId, topicsTable.topicId))
+      .where(
+        and(eq(quizzesTable.quizId, quizId), eq(quizzesTable.userId, userId))
+      )
+      .limit(1);
+
+    if (!quiz.length) {
+      return res.status(404).json(new ApiResponse(404, {}, 'Quiz not found'));
+    }
+
+    // Get quiz questions
+    const questions = await db
+      .select({
+        id: quizQuestionsTable.questionId,
+        question: quizQuestionsTable.question,
+        optionA: quizQuestionsTable.optionA,
+        optionB: quizQuestionsTable.optionB,
+        optionC: quizQuestionsTable.optionC,
+        optionD: quizQuestionsTable.optionD,
+        correctAnswer: quizQuestionsTable.correctAnswer,
+        difficulty: quizQuestionsTable.difficulty,
+      })
+      .from(quizQuestionsTable)
+      .where(eq(quizQuestionsTable.quizId, quizId));
+
+    // Format response data
+    const responseData = {
+      quiz: {
+        id: quiz[0].quizzes.quizId,
+        isNewQuiz: false,
+        isTopicBased: !!quiz[0].quizzes.topicId,
+        ...(quiz[0].topics && {
+          topic: {
+            id: quiz[0].topics.topicId,
+            title: quiz[0].topics.title,
+            description: quiz[0].topics.description,
+            difficulty: quiz[0].topics.difficulty,
+          },
+        }),
+        subject: {
+          id: quiz[0].subjects.subjectId,
+          name: quiz[0].subjects.subjectName,
+        },
+      },
+      questions: questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: [q.optionA, q.optionB, q.optionC, q.optionD],
+        difficulty: q.difficulty,
+        // Don't include correctAnswer in response for security
+      })),
+      quiz_metadata: {
+        total_questions: questions.length,
+        has_weakness_focus: false,
+        content_length_category: 'existing',
+      },
+    };
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, responseData, 'Quiz loaded successfully'));
+  } catch (error) {
+    console.error('Error loading quiz:', error);
     res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
   }
 });
