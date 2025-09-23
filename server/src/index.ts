@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import logger from 'morgan';
 import user_router from './routes/auth-route';
+import subject_router from './routes/subject-route';
 import topic_router from './routes/topic-route';
 
 dotenv.config();
@@ -24,6 +25,8 @@ app.use(
 
 // Mount user router
 app.use('/api/auth', user_router);
+// Mount subject router
+app.use('/api/subject', subject_router);
 // Mount topic router
 app.use('/api/topic', topic_router);
 

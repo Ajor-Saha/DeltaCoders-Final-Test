@@ -1,6 +1,14 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import axios from 'axios';
+import { eq } from 'drizzle-orm';
 import { Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../db';
+import { lessonsTable } from '../db/schema/tbl-lessons';
+import { quizQuestionsTable } from '../db/schema/tbl-quiz-questions';
+import { quizzesTable } from '../db/schema/tbl-quizzes';
+import { subjectsTable } from '../db/schema/tbl-subjects';
+import { topicsTable } from '../db/schema/tbl-topics';
 import { ApiResponse } from '../utils/api-response';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -15,9 +23,31 @@ export const createAllTopics = asyncHandler(
           .json(new ApiResponse(400, {}, 'Subject name is required'));
       }
 
+      // Step 2: Check if subject exists in database
+      const existingSubject = await db
+        .select()
+        .from(subjectsTable)
+        .where(eq(subjectsTable.subjectName, subject.trim()))
+        .limit(1);
+
+      if (existingSubject.length === 0) {
+        return res
+          .status(404)
+          .json(
+            new ApiResponse(
+              404,
+              {},
+              `Subject "${subject}" not found. Please create the subject first before generating topics.`
+            )
+          );
+      }
+
+      // Step 1: Call external API to generate topics with enhanced prompt
+      const enhancedSubject = `Generate at least 10 topics for ${subject}. Include topics with different difficulty levels: Easy, Medium, and Hard. Ensure a good mix of foundational concepts and advanced topics.`;
+
       const response = await axios.post(
         process.env.TOPIC_LIST_URL!,
-        { subject },
+        { subject: enhancedSubject },
         {
           headers: {
             'Content-Type': 'application/json',
@@ -25,7 +55,10 @@ export const createAllTopics = asyncHandler(
         }
       );
 
-      const topicList = response.data?.topic_list;
+      const topicList =
+        response.data?.topic_list ||
+        response.data?.data?.generatedTopics ||
+        response.data?.generatedTopics;
 
       if (!topicList || !Array.isArray(topicList)) {
         return res
@@ -39,18 +72,77 @@ export const createAllTopics = asyncHandler(
           );
       }
 
+      const subjectRecord = existingSubject[0];
+
+      // Step 3: Save topics to database
+      const topicsToInsert = topicList.map((topic: any) => {
+        // The API now returns objects with title, description, and difficulty
+        let title: string;
+        let description: string | null = null;
+        let difficulty: 'Easy' | 'Medium' | 'Hard' = 'Easy';
+
+        if (typeof topic === 'object' && topic !== null) {
+          // New API format: topic is an object
+          title = topic.title || topic.topic || topic.name || String(topic);
+          description = topic.description || null;
+
+          // Map difficulty directly from API response
+          if (topic.difficulty) {
+            const diff = topic.difficulty;
+            if (diff === 'Medium' || diff === 'Intermediate') {
+              difficulty = 'Medium';
+            } else if (diff === 'Hard' || diff === 'Advanced') {
+              difficulty = 'Hard';
+            } else {
+              difficulty = 'Easy';
+            }
+          }
+        } else if (typeof topic === 'string') {
+          // Fallback for string format (backward compatibility)
+          title = topic;
+        } else {
+          // Fallback for any other format
+          title = String(topic);
+        }
+
+        return {
+          topicId: uuidv4(),
+          subjectId: subjectRecord.subjectId,
+          title: title.trim(),
+          description,
+          difficulty,
+        };
+      }); // Insert topics in batch
+      const insertedTopics = await db
+        .insert(topicsTable)
+        .values(topicsToInsert)
+        .returning();
+
+      // Step 4: Return success response with database data
       return res.status(200).json(
         new ApiResponse(
           200,
           {
-            subject,
-            generatedTopics: topicList,
+            subject: {
+              id: subjectRecord.subjectId,
+              name: subjectRecord.subjectName,
+            },
+            topics: insertedTopics.map(topic => ({
+              id: topic.topicId,
+              title: topic.title,
+              description: topic.description,
+              difficulty: topic.difficulty,
+              createdAt: topic.createdAt,
+            })),
+            summary: {
+              totalTopics: insertedTopics.length,
+            },
           },
-          'Topics generated successfully'
+          `Successfully generated and saved ${insertedTopics.length} topics for subject: ${subject}`
         )
       );
     } catch (error) {
-      console.error('Error generating topics:', error);
+      console.error('Error generating and saving topics:', error);
       const errorMessage =
         axios.isAxiosError(error) && error.response?.data?.message
           ? error.response.data.message
@@ -71,8 +163,36 @@ export const generateLearningContent = asyncHandler(
           .json(new ApiResponse(400, {}, 'Subject and topic are required'));
       }
 
+      // Find the topic ID by searching for the topic name in the database
+      let validatedTopicId = null;
+      const existingTopic = await db
+        .select()
+        .from(topicsTable)
+        .innerJoin(
+          subjectsTable,
+          eq(topicsTable.subjectId, subjectsTable.subjectId)
+        )
+        .where(
+          eq(topicsTable.title, topic.trim()) &&
+            eq(subjectsTable.subjectName, subject.trim())
+        )
+        .limit(1);
+
+      if (existingTopic.length > 0) {
+        validatedTopicId = existingTopic[0].topics.topicId;
+        console.log('Found existing topic with ID:', validatedTopicId);
+      } else {
+        console.log(
+          'No existing topic found for:',
+          topic,
+          'in subject:',
+          subject
+        );
+        // Topic doesn't exist in database, but we can still generate content without linking
+      }
+
       const ai = new GoogleGenAI({
-        apiKey: 'AIzaSyDTGafZ-KOR2FSctp5Z0mVXozrr6jaM5pg',
+        apiKey: process.env.GEMINI_API_KEY,
       });
 
       const systemPrompt = `You are a Smart Study Companion for students from any academic field.
@@ -94,20 +214,126 @@ export const generateLearningContent = asyncHandler(
 
                         Now, generate the study notes.`;
 
-      const response = await ai.models.generateContentStream({
+      // Generate content using streaming API for user experience
+      console.log('Generating learning content...');
+      const streamResponse = await ai.models.generateContentStream({
         model: 'gemini-2.5-flash',
         contents: userPrompt,
       });
 
+      // Set up streaming response headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      for await (const chunk of response) {
+      // Send initial metadata (before we have lessonId)
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'start',
+          topicId: validatedTopicId,
+          topicLinked: validatedTopicId !== null,
+          subject: subject,
+          topic: topic,
+          message: 'Starting content generation...',
+        })}\n\n`
+      );
+
+      // Collect all content chunks for database storage
+      let fullGeneratedContent = '';
+
+      // Stream content to user while collecting it
+      for await (const chunk of streamResponse) {
         if (chunk.text) {
-          res.write(`data: ${JSON.stringify({ content: chunk.text })}\n\n`);
+          fullGeneratedContent += chunk.text;
+
+          // Stream to user
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'content',
+              content: chunk.text,
+            })}\n\n`
+          );
         }
       }
+
+      // After streaming is complete, save to database
+      let savedLesson;
+
+      if (fullGeneratedContent.trim() === '') {
+        res.write(
+          `data: ${JSON.stringify({
+            type: 'error',
+            message: 'Failed to generate learning content',
+          })}\n\n`
+        );
+        res.end();
+        return;
+      }
+
+      if (validatedTopicId) {
+        // Save with topic link
+        const lessonData = {
+          lessonId: uuidv4(),
+          topicId: validatedTopicId,
+          content: fullGeneratedContent,
+        };
+
+        try {
+          savedLesson = await db
+            .insert(lessonsTable)
+            .values(lessonData)
+            .returning();
+
+          console.log(
+            `Learning content saved to database with ID: ${savedLesson[0].lessonId} (linked to topic: ${validatedTopicId})`
+          );
+        } catch (dbError) {
+          console.error('Error saving to database:', dbError);
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'warning',
+              message: 'Content generated but failed to save to database',
+            })}\n\n`
+          );
+        }
+      } else {
+        console.log(
+          'Skipping lesson save - no matching topic found in database'
+        );
+
+        // Generate a temporary lesson object for response
+        savedLesson = [
+          {
+            lessonId: uuidv4(),
+            topicId: null,
+            content: fullGeneratedContent,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+      }
+
+      // Send final metadata and completion signal
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'metadata',
+          lessonId: savedLesson ? savedLesson[0].lessonId : null,
+          topicId: validatedTopicId,
+          topicLinked: validatedTopicId !== null,
+          savedToDatabase: validatedTopicId !== null && savedLesson,
+          contentLength: fullGeneratedContent.length,
+          createdAt: savedLesson ? savedLesson[0].createdAt : new Date(),
+        })}\n\n`
+      );
+
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'complete',
+          message: validatedTopicId
+            ? 'Content generation completed and saved to database (linked to existing topic)'
+            : 'Content generation completed but not saved to lessons table (no matching topic found - please create the topic first)',
+        })}\n\n`
+      );
 
       res.end();
     } catch (error) {
@@ -120,64 +346,197 @@ export const generateLearningContent = asyncHandler(
 export const generateQuiz = asyncHandler(
   async (req: Request, res: Response) => {
     try {
-      const { existing_content, weakness_topics, user_query } = req.body;
+      const {
+        isNewQuiz,
+        quizId,
+        isTopicBased,
+        topicId,
+        subjectId,
+        weakness,
+        user_query,
+      } = req.body;
+      const userId = req.user.userId;
 
-      if (!existing_content || existing_content.trim() === '') {
+      // Validation
+      if (isNewQuiz === undefined || typeof isNewQuiz !== 'boolean') {
         return res
           .status(400)
-          .json(new ApiResponse(400, {}, 'Existing content is required'));
+          .json(new ApiResponse(400, {}, 'isNewQuiz flag is required'));
+      }
+
+      if (isTopicBased === undefined || typeof isTopicBased !== 'boolean') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'isTopicBased flag is required'));
+      }
+
+      // If not new quiz, quizId is required
+      if (!isNewQuiz && (!quizId || quizId.trim() === '')) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(
+              400,
+              {},
+              'quizId is required when isNewQuiz is false'
+            )
+          );
+      }
+
+      // If topic-based, topicId is required. If subject-based, subjectId is required
+      if (isTopicBased && (!topicId || topicId.trim() === '')) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(
+              400,
+              {},
+              'topicId is required when isTopicBased is true'
+            )
+          );
+      }
+
+      if (!isTopicBased && (!subjectId || subjectId.trim() === '')) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(
+              400,
+              {},
+              'subjectId is required when isTopicBased is false'
+            )
+          );
+      }
+
+      let finalQuizId = quizId;
+      let content = '';
+      let topicInfo = null;
+      let subjectInfo = null;
+
+      // If new quiz, create quiz entry first
+      if (isNewQuiz) {
+        const newQuizId = uuidv4();
+        const quizData = {
+          quizId: newQuizId,
+          userId,
+          topicId: isTopicBased ? topicId : null,
+          subjectId: isTopicBased ? null : subjectId,
+          attemptCount: 0,
+        };
+
+        await db.insert(quizzesTable).values(quizData);
+        finalQuizId = newQuizId;
+        console.log(`New quiz created with ID: ${finalQuizId}`);
+      }
+
+      // Get content based on topic or subject
+      if (isTopicBased) {
+        // Get content from specific topic
+        const topicData = await db
+          .select()
+          .from(topicsTable)
+          .innerJoin(
+            subjectsTable,
+            eq(topicsTable.subjectId, subjectsTable.subjectId)
+          )
+          .where(eq(topicsTable.topicId, topicId))
+          .limit(1);
+
+        if (topicData.length === 0) {
+          return res
+            .status(404)
+            .json(new ApiResponse(404, {}, 'Topic not found'));
+        }
+
+        topicInfo = topicData[0].topics;
+        subjectInfo = topicData[0].subjects;
+
+        // Get lessons content for this topic
+        const lessons = await db
+          .select()
+          .from(lessonsTable)
+          .where(eq(lessonsTable.topicId, topicId));
+
+        if (lessons.length > 0) {
+          content = lessons.map(lesson => lesson.content).join('\n\n');
+        } else {
+          content = `Topic: ${topicInfo.title}\nDescription: ${
+            topicInfo.description || 'No description available'
+          }`;
+        }
+
+        console.log(`Generating quiz for topic: ${topicInfo.title}`);
+      } else {
+        // Get content from all topics under the subject
+        const subjectData = await db
+          .select()
+          .from(subjectsTable)
+          .where(eq(subjectsTable.subjectId, subjectId))
+          .limit(1);
+
+        if (subjectData.length === 0) {
+          return res
+            .status(404)
+            .json(new ApiResponse(404, {}, 'Subject not found'));
+        }
+
+        subjectInfo = subjectData[0];
+
+        // Get all topics for this subject
+        const topicsData = await db
+          .select()
+          .from(topicsTable)
+          .where(eq(topicsTable.subjectId, subjectId));
+
+        if (topicsData.length === 0) {
+          content = `Subject: ${subjectInfo.subjectName}\nNo topics found for this subject.`;
+        } else {
+          // Get lessons for all topics
+          const allLessons = [];
+          for (const topic of topicsData) {
+            const lessons = await db
+              .select()
+              .from(lessonsTable)
+              .where(eq(lessonsTable.topicId, topic.topicId));
+
+            if (lessons.length > 0) {
+              allLessons.push(
+                ...lessons.map(
+                  lesson => `Topic: ${topic.title}\n${lesson.content}`
+                )
+              );
+            } else {
+              allLessons.push(
+                `Topic: ${topic.title}\nDescription: ${
+                  topic.description || 'No description available'
+                }`
+              );
+            }
+          }
+          content = allLessons.join('\n\n');
+        }
+
+        console.log(`Generating quiz for subject: ${subjectInfo.subjectName}`);
+      }
+
+      if (!content.trim()) {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, {}, 'No content available to generate quiz')
+          );
       }
 
       const ai = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
       });
 
-      let newlyCreatedContent = '';
-      let finalContent = existing_content;
+      console.log('Generating quiz questions...');
 
-      // AGENT 1: Generate content for weakness topics if provided
-      if (
-        weakness_topics &&
-        Array.isArray(weakness_topics) &&
-        weakness_topics.length > 0
-      ) {
-        console.log('Agent 1: Generating content for weakness topics...');
-
-        const contentPrompt = `You are a Smart Study Companion. Generate short, clear, and beginner-friendly study notes for the following weakness topics:
-
-Weakness Topics: ${weakness_topics.join(', ')}
-
-Guidelines:
-- Generate comprehensive but concise study notes for each topic
-- Use simple language and clear explanations
-- Include examples where relevant
-- Structure with headings and bullet points
-- Focus on key concepts that students typically struggle with
-
-Generate detailed study content for these topics.`;
-
-        const contentResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: contentPrompt,
-        });
-
-        newlyCreatedContent = contentResponse.text || '';
-        finalContent =
-          existing_content +
-          '\n\n--- Additional Study Material for Weak Topics ---\n\n' +
-          newlyCreatedContent;
-      }
-
-      // AGENT 2: Generate quiz based on content and requirements
-      console.log('Agent 2: Generating quiz...');
-
-      const hasWeaknessTopics =
-        weakness_topics &&
-        Array.isArray(weakness_topics) &&
-        weakness_topics.length > 0;
+      const hasWeakness = weakness && weakness.trim() !== '';
 
       // Determine quiz length based on content
-      const contentLength = finalContent.length;
+      const contentLength = content.length;
       let quizLength = 5; // default
       if (contentLength > 2000) quizLength = 10;
       else if (contentLength > 1000) quizLength = 8;
@@ -185,30 +544,28 @@ Generate detailed study content for these topics.`;
 
       let quizPrompt = '';
 
-      if (hasWeaknessTopics) {
-        quizPrompt = `You are a Quiz Generator. Create a quiz based on the following content with specific focus distribution:
+      if (hasWeakness) {
+        quizPrompt = `You are a Quiz Generator. Create a quiz based on the following content with focus on user's weakness areas:
 
-**Final Content:** ${finalContent}
+**Content:** ${content}
 
-**Weakness Topics:** ${weakness_topics.join(', ')}
+**User Weakness Summary:** ${weakness}
 
 **User Preferences:** ${user_query || 'No specific preferences'}
 
 **Requirements:**
 - Generate ${quizLength} multiple choice questions
-- 70% of questions should focus on weakness topics: ${weakness_topics.join(
-          ', '
-        )}
-- 30% of questions should come from the original existing content
+- Focus more on the weakness areas mentioned: ${weakness}
 - Each question should have 4 options (A, B, C, D)
-- Include the correct answer
+- Include the correct answer (full option text including the letter)
+- Mix of difficulty levels (easy, medium, hard)
 ${user_query ? `- Apply user preferences: ${user_query}` : ''}
 
 Create a challenging but fair quiz that helps reinforce the weak areas.`;
       } else {
         quizPrompt = `You are a Quiz Generator. Create a quiz based on the following content:
 
-**Content:** ${existing_content}
+**Content:** ${content}
 
 **User Preferences:** ${user_query || 'No specific preferences'}
 
@@ -216,7 +573,7 @@ Create a challenging but fair quiz that helps reinforce the weak areas.`;
 - Generate ${quizLength} multiple choice questions based on content length
 - Questions should cover the main concepts from the content
 - Each question should have 4 options (A, B, C, D)
-- Include the correct answer
+- Include the correct answer (full option text including the letter)
 - Mix of difficulty levels (easy, medium, hard)
 ${user_query ? `- Apply user preferences: ${user_query}` : ''}
 
@@ -251,16 +608,12 @@ Create a comprehensive quiz that tests understanding of the content.`;
                     difficulty: {
                       type: Type.STRING,
                     },
-                    topic_focus: {
-                      type: Type.STRING,
-                    },
                   },
                   propertyOrdering: [
                     'question',
                     'options',
                     'answer',
                     'difficulty',
-                    'topic_focus',
                   ],
                 },
               },
@@ -280,23 +633,72 @@ Create a comprehensive quiz that tests understanding of the content.`;
 
       const generatedQuiz = JSON.parse(quizResponseText);
 
-      // Prepare response based on whether weakness topics were provided
+      // Save quiz questions to database
+      const questionsToInsert = generatedQuiz.quiz.map((q: any) => {
+        const options = Array.isArray(q.options) ? q.options : [];
+        const optionA = options[0] || `A) Option A`;
+        const optionB = options[1] || `B) Option B`;
+        const optionC = options[2] || `C) Option C`;
+        const optionD = options[3] || `D) Option D`;
+
+        return {
+          questionId: uuidv4(),
+          quizId: finalQuizId,
+          question: q.question || 'Sample question',
+          optionA,
+          optionB,
+          optionC,
+          optionD,
+          correctAnswer: q.answer || optionA,
+          difficulty: q.difficulty || 'medium',
+          userChoice: null,
+        };
+      });
+
+      const savedQuestions = await db
+        .insert(quizQuestionsTable)
+        .values(questionsToInsert)
+        .returning();
+
+      console.log(`Quiz questions saved: ${savedQuestions.length} questions`);
+
+      // Prepare response
       const responseData = {
-        existing_content,
-        weakness_topics: weakness_topics || [],
-        user_query: user_query || '',
-        newly_created_content: newlyCreatedContent,
-        merged_content: hasWeaknessTopics ? finalContent : existing_content,
-        quiz: generatedQuiz.quiz,
+        quiz: {
+          id: finalQuizId,
+          isNewQuiz,
+          isTopicBased,
+          ...(topicInfo && {
+            topic: {
+              id: topicInfo.topicId,
+              title: topicInfo.title,
+              description: topicInfo.description,
+              difficulty: topicInfo.difficulty,
+            },
+          }),
+          subject: {
+            id: subjectInfo?.subjectId || '',
+            name: subjectInfo?.subjectName || '',
+          },
+        },
+        questions: savedQuestions.map(q => ({
+          id: q.questionId,
+          question: q.question,
+          options: [q.optionA, q.optionB, q.optionC, q.optionD],
+          difficulty: q.difficulty,
+          // Don't include correctAnswer in response for security
+        })),
         quiz_metadata: {
-          total_questions: generatedQuiz.quiz.length,
-          has_weakness_focus: hasWeaknessTopics,
+          total_questions: savedQuestions.length,
+          has_weakness_focus: hasWeakness,
           content_length_category:
             contentLength > 2000
               ? 'long'
               : contentLength > 1000
               ? 'medium'
               : 'short',
+          weakness: weakness || '',
+          user_query: user_query || '',
         },
       };
 
@@ -306,9 +708,9 @@ Create a comprehensive quiz that tests understanding of the content.`;
           new ApiResponse(
             200,
             responseData,
-            hasWeaknessTopics
-              ? 'Quiz generated successfully with weakness topic focus'
-              : 'Quiz generated successfully from existing content'
+            `Quiz generated successfully with ${
+              savedQuestions.length
+            } questions${hasWeakness ? ' (focused on weakness areas)' : ''}`
           )
         );
     } catch (error) {
@@ -779,3 +1181,41 @@ Generate questions that would help students review and test their understanding 
     }
   }
 );
+
+export const createQuiz = asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { topicId, subjectId } = req.body;
+    const userId = req.user.userId;
+
+    // Check if either topicId or subjectId is provided
+    if (!topicId && !subjectId) {
+      return res
+        .status(400)
+        .json(
+          new ApiResponse(400, {}, 'Either topicId or subjectId is required')
+        );
+    }
+
+    // Create quiz record in database
+    const quizId = uuidv4();
+    const quizData = {
+      quizId,
+      userId,
+      topicId: topicId || null,
+      subjectId: subjectId || null,
+      attemptCount: 0,
+    };
+
+    const savedQuiz = await db
+      .insert(quizzesTable)
+      .values(quizData)
+      .returning();
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, savedQuiz[0], 'Quiz created successfully'));
+  } catch (error) {
+    console.error('Error creating quiz:', error);
+    res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
+  }
+});

@@ -1,6 +1,6 @@
 {
-  "id": "ec52428d-4c4c-4d41-984f-eb893dc5003f",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "50e8721a-027a-45c9-b4bd-c5ee5bae735f",
+  "prevId": "ec52428d-4c4c-4d41-984f-eb893dc5003f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -188,6 +188,12 @@
         },
         "total_marks": {
           "name": "total_marks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_taken": {
+          "name": "time_taken",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -614,7 +620,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": false,
-          "default": "'easy'"
+          "default": "'Easy'"
         },
         "created_at": {
           "name": "created_at",
@@ -829,9 +835,9 @@
       "name": "topic_difficulty",
       "schema": "public",
       "values": [
-        "easy",
-        "medium",
-        "hard"
+        "Easy",
+        "Medium",
+        "Hard"
       ]
     },
     "public.user_level": {
