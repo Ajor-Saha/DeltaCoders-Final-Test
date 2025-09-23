@@ -23,6 +23,7 @@ import { Axios } from "@/config/axios";
 import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
+  Bot,
   Building2,
   FolderKanban,
   GalleryVerticalEnd,
@@ -35,7 +36,6 @@ import {
   PlusCircle,
   SettingsIcon,
   UserCog,
-  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -45,11 +45,7 @@ import { NavUser } from "./nav-user";
 // Sidebar Data
 const sidebarData = {
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: <LayoutDashboard size={20} />,
-    },
+
     {
       title: "Subject",
       url: "/dashboard/subjects",
@@ -95,26 +91,9 @@ const sidebarData = {
       ],
     },
     {
-      title: "Employee",
-      url: "#",
-      icon: <Users size={20} />,
-      items: [
-        {
-          title: "Add Employee",
-          url: "/employee/add-employee",
-          icon: <PlusCircle size={16} />,
-        },
-        {
-          title: "Show Employees",
-          url: "/employee/show-employees",
-          icon: <List size={16} />,
-        },
-        {
-          title: "Performance",
-          url: "/employee/performance",
-          icon: <LayoutGrid size={16} />,
-        }
-      ],
+      title: "AI Support",
+      url: "/dashboard/ai-tutor",
+      icon: <Bot size={20} />,
     },
   ],
 };
@@ -177,22 +156,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarMenu>
             {sidebarData.navMain.map((item, index) => (
-              <Collapsible
-                key={item.title}
-                defaultOpen={pathname.startsWith(item.url)}
-                className="group/collapsible"
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton>
-                      {item.icon && <span className="mr-2">{item.icon}</span>}
-                      {item.title}
-                      <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
-                      <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
+              item.items?.length ? (
+                <Collapsible
+                  key={item.title}
+                  defaultOpen={pathname.startsWith(item.url)}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton>
+                        {item.icon && <span className="mr-2">{item.icon}</span>}
+                        {item.title}
+                        <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
+                        <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
 
-                  {item.items?.length ? (
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {item.items.map((subItem) => (
@@ -213,9 +192,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         ))}
                       </SidebarMenuSub>
                     </CollapsibleContent>
-                  ) : null}
+                  </SidebarMenuItem>
+                </Collapsible>
+              ) : (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={pathname === item.url}>
+                    <a href={item.url} className="flex items-center gap-2">
+                      {item.icon && <span className="mr-2">{item.icon}</span>}
+                      {item.title}
+                    </a>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
-              </Collapsible>
+              )
             ))}
           </SidebarMenu>
         </SidebarGroup>
