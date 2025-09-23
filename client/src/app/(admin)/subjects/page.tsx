@@ -9,7 +9,7 @@ import { BookOpen, Calendar, Plus, TrendingUp, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { SubjectForm } from "../_components/subject-form";
+import { SubjectForm } from "./_components/subject-form";
 
 interface UserSubject {
   id: string;
@@ -45,7 +45,7 @@ export default function SubjectsPage() {
 
   const handleSubjectClick = (subjectName: string) => {
     const encodedName = subjectName.toLowerCase().replace(/\s+/g, '-');
-    router.push(`/dashboard/subjects/${encodedName}`);
+    router.push(`/subjects/${encodedName}`);
   };
 
   const fetchUserSubjects = async () => {

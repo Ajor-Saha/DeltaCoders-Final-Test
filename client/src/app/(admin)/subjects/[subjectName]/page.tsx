@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Axios } from "@/config/axios";
+import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
   ArrowLeft,
@@ -15,12 +16,15 @@ import {
   FileText,
   HelpCircle,
   PlayCircle,
+  RefreshCw,
   Target
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { QuizMaker } from "../_components/quiz-maker";
 
 interface Topic {
   topicId: string;
@@ -54,8 +58,97 @@ export default function SubjectDetailPage() {
     topicId?: string;
     topic?: Topic;
   }>({ type: 'overview' });
+  const [lessonContent, setLessonContent] = useState<string>('');
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [contentMetadata, setContentMetadata] = useState<any>(null);
+  const [contentError, setContentError] = useState<string>('');
+  const [quizData, setQuizData] = useState<any>(null);
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [quizError, setQuizError] = useState<string>('');
 
   const { isAuthenticated, accessToken } = useAuthStore();
+
+  // Generate quiz function that can be called from QuizMaker
+  const handleGenerateQuiz = async (topic: Topic, includeWeakness = false, weakness?: string) => {
+    if (!isAuthenticated || !accessToken) {
+      toast.error("Please log in to generate quiz");
+      return null;
+    }
+
+    setIsGeneratingQuiz(true);
+    setQuizData(null);
+    setQuizError('');
+
+    try {
+      const weaknessQuery = includeWeakness && weakness
+        ? `Generate quiz focusing on weakness areas: ${weakness}`
+        : `Generate quiz for ${topic.title}`;
+
+      const response = await Axios.post('/api/topic/generate-quiz', {
+        isNewQuiz: true,
+        isTopicBased: true,
+        topicId: topic.topicId,
+        weakness: includeWeakness ? weakness : undefined,
+        user_query: weaknessQuery,
+      }, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        setQuizData(response.data.data);
+        toast.success("Quiz generated successfully! 🎯");
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to generate quiz');
+      }
+    } catch (error: any) {
+      console.error('Error generating quiz:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to generate quiz';
+      setQuizError(errorMessage);
+      toast.error("Failed to generate quiz: " + errorMessage);
+      return null;
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
+
+  // Load existing quiz function
+  const handleLoadQuiz = async (quizId: string) => {
+    if (!isAuthenticated || !accessToken) {
+      toast.error("Please log in to load quiz");
+      return null;
+    }
+
+    setIsGeneratingQuiz(true);
+    setQuizData(null);
+    setQuizError('');
+
+    try {
+      const response = await Axios.get(`/api/topic/quiz/${quizId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        setQuizData(response.data.data);
+        toast.success("Quiz loaded successfully!");
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Failed to load quiz');
+      }
+    } catch (error: any) {
+      console.error('Error loading quiz:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load quiz';
+      setQuizError(errorMessage);
+      toast.error("Failed to load quiz: " + errorMessage);
+      return null;
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
 
   // Find subject by name and get its details
   const fetchSubjectDetail = async () => {
@@ -114,6 +207,129 @@ export default function SubjectDetailPage() {
 
   const selectContent = (type: 'learnings' | 'lessons' | 'quiz', topicId: string, topic: Topic) => {
     setSelectedContent({ type, topicId, topic });
+
+    // Reset lesson content when switching topics or content types
+    if (type === 'lessons') {
+      setLessonContent('');
+      setContentMetadata(null);
+      setContentError('');
+      // Automatically generate content when lessons is selected
+      generateLessonContent(topic);
+    }
+
+    // Reset quiz data and show quiz selection interface
+    if (type === 'quiz') {
+      setQuizData(null);
+      setQuizError('');
+      // Don't automatically generate quiz - let QuizMaker handle it
+    }
+  };
+
+  const generateLessonContent = async (topic: Topic) => {
+    if (!isAuthenticated || !accessToken) {
+      toast.error("Please log in to generate content");
+      return;
+    }
+
+    setIsGeneratingContent(true);
+    setLessonContent('');
+    setContentMetadata(null);
+    setContentError('');
+
+    try {
+      const response = await fetch(`${env.BACKEND_BASE_URL}/api/topic/generate-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          subject: subjectDetail?.subjectName,
+          topic: topic.title
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim() === '') continue;
+
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              switch (data.type) {
+                case 'start':
+                  console.log('Content generation started:', data.message);
+                  if (data.cached) {
+                    toast.success("Loading cached content...");
+                  } else {
+                    toast.info("Generating new content...");
+                  }
+                  break;
+
+                case 'content':
+                  setLessonContent(prev => prev + data.content);
+                  break;
+
+                case 'metadata':
+                  setContentMetadata(data);
+                  break;
+
+                case 'complete':
+                  console.log('Content generation completed:', data.message);
+                  if (data.cached) {
+                    toast.success("Content loaded successfully!");
+                  } else {
+                    toast.success("Content generated and saved!");
+                  }
+                  break;
+
+                case 'error':
+                  setContentError(data.message);
+                  toast.error("Error: " + data.message);
+                  break;
+
+                case 'warning':
+                  toast.warning("Warning: " + data.message);
+                  break;
+              }
+            } catch (parseError) {
+              console.error('Error parsing SSE data:', parseError);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Error generating content:', error);
+      setContentError('Failed to generate content. Please try again.');
+      toast.error("Failed to generate content");
+    } finally {
+      setIsGeneratingContent(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -411,27 +627,190 @@ export default function SubjectDetailPage() {
                 )}
 
                 {selectedContent.type === 'lessons' && (
-                  <div className="text-center py-12">
-                    <PlayCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Lessons Coming Soon
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Video lessons and interactive content will be available soon.
-                    </p>
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold">Interactive Lessons</h3>
+                      {!isGeneratingContent && lessonContent && (
+                        <Button
+                          onClick={() => selectedContent.topic && generateLessonContent(selectedContent.topic)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Regenerate
+                        </Button>
+                      )}
+                    </div>
+
+                    {isGeneratingContent && (
+                      <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-3">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                          </div>
+                          <span className="text-blue-700 dark:text-blue-300 text-sm font-medium">
+                            AI is generating personalized learning content...
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {contentError && (
+                      <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                        <p className="text-red-700 dark:text-red-300 text-sm">{contentError}</p>
+                        <Button
+                          onClick={() => selectedContent.topic && generateLessonContent(selectedContent.topic)}
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retry
+                        </Button>
+                      </div>
+                    )}
+
+                    {lessonContent && (
+                      <div className="space-y-4">
+                        {/* Content Metadata */}
+                        {contentMetadata && (
+                          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-4">
+                            {contentMetadata.cached && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                Cached content
+                              </span>
+                            )}
+                            <span>
+                              {contentMetadata.contentLength} characters
+                            </span>
+                            {contentMetadata.topicLinked && (
+                              <span className="text-green-600 dark:text-green-400">
+                                ✓ Linked to topic
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Generated Content */}
+                        <div className="prose dark:prose-invert max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700">
+                          <ReactMarkdown
+                            components={{
+                              h1: ({ children }) => (
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 mt-6">
+                                  {children}
+                                </h1>
+                              ),
+                              h2: ({ children }) => (
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-5">
+                                  {children}
+                                </h2>
+                              ),
+                              h3: ({ children }) => (
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
+                                  {children}
+                                </h3>
+                              ),
+                              p: ({ children }) => (
+                                <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+                                  {children}
+                                </p>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="list-disc list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </ul>
+                              ),
+                              ol: ({ children }) => (
+                                <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </ol>
+                              ),
+                              li: ({ children }) => (
+                                <li className="text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </li>
+                              ),
+                              code: ({ children, className }) => {
+                                const isInline = !className;
+                                return isInline ? (
+                                  <code className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded text-sm font-mono">
+                                    {children}
+                                  </code>
+                                ) : (
+                                  <code className={className}>
+                                    {children}
+                                  </code>
+                                );
+                              },
+                              pre: ({ children }) => (
+                                <pre className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4 overflow-x-auto">
+                                  {children}
+                                </pre>
+                              ),
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-blue-500 pl-4 py-2 mb-4 bg-blue-50 dark:bg-blue-900/20 text-gray-700 dark:text-gray-300 italic">
+                                  {children}
+                                </blockquote>
+                              ),
+                              strong: ({ children }) => (
+                                <strong className="font-semibold text-gray-900 dark:text-gray-100">
+                                  {children}
+                                </strong>
+                              ),
+                              em: ({ children }) => (
+                                <em className="italic text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </em>
+                              ),
+                            }}
+                          >
+                            {lessonContent}
+                          </ReactMarkdown>
+                        </div>
+
+                        {/* Additional Actions */}
+                        {contentMetadata && (
+                          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                              <span>
+                                {contentMetadata.cached
+                                  ? 'Content was loaded from cache'
+                                  : 'Content was generated and saved to database'
+                                }
+                              </span>
+                              {contentMetadata.createdAt && (
+                                <span>
+                                  Created: {new Date(contentMetadata.createdAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
                  {selectedContent.type === 'quiz' && (
-                   <div className="text-center py-12">
-                     <HelpCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                       Quiz Coming Soon
-                     </h3>
-                     <p className="text-gray-600 dark:text-gray-400">
-                       Interactive quizzes to test your knowledge will be available soon.
-                     </p>
-                   </div>
+                   <QuizMaker
+                     quizData={quizData}
+                     isLoading={isGeneratingQuiz}
+                     topicId={selectedContent.topicId}
+                     topic={selectedContent.topic}
+                     onGenerateQuiz={handleGenerateQuiz}
+                     onLoadQuiz={handleLoadQuiz}
+                     onStartQuiz={() => {
+                       // Quiz is already loaded, just start it
+                     }}
+                     onRetakeQuiz={() => {
+                       // Reset quiz data to show selection interface again
+                       setQuizData(null);
+                     }}
+                   />
                  )}
               </CardContent>
             </Card>

@@ -14,7 +14,7 @@ import {
 import { Axios } from "@/config/axios";
 import { getFilteredSubjects } from "@/constants/subjectlist";
 import useAuthStore from "@/store/store";
-import { BookOpen, Check, Send, Target } from "lucide-react";
+import { BookOpen, Bot, Check, Send, Sparkles, Target } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -39,6 +39,8 @@ export function SubjectForm({ onSuccess }: SubjectFormProps) {
     skillLevel: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingTopics, setIsGeneratingTopics] = useState(false);
+  const [topicGenerationStep, setTopicGenerationStep] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
@@ -53,6 +55,51 @@ export function SubjectForm({ onSuccess }: SubjectFormProps) {
   console.log("🔐 JWT Token:", accessToken);
   console.log("👤 User:", user);
   console.log("✅ Is Authenticated:", isAuthenticated);
+
+  const generateTopics = async (subjectName: string) => {
+    setIsGeneratingTopics(true);
+    setTopicGenerationStep("🤖 AI Agent is searching for topic information...");
+
+    try {
+      // Simulate some delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setTopicGenerationStep("🔍 Agent is gathering comprehensive topic list...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      setTopicGenerationStep("📚 Agent is organizing topics by difficulty levels...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setTopicGenerationStep("⚡ Creating all topics for your subject...");
+
+      const response = await Axios.post('/api/topic/generate-topic', {
+        subject: subjectName
+      }, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.status === 200 || response.status === 201) {
+        setTopicGenerationStep("✅ Agent successfully created all topic list!");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        toast.success("Topics Generated! 🎯", {
+          description: `AI Agent has successfully created comprehensive topics for ${subjectName}!`
+        });
+      }
+    } catch (error: any) {
+      console.error("Error generating topics:", error);
+      setTopicGenerationStep("❌ Failed to generate topics");
+
+      toast.error("Topic Generation Failed", {
+        description: "The AI agent encountered an issue. Topics will be created later."
+      });
+    } finally {
+      setIsGeneratingTopics(false);
+      setTopicGenerationStep("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,15 +131,23 @@ export function SubjectForm({ onSuccess }: SubjectFormProps) {
 
       // Success handling
       if (response.status === 200 || response.status === 201) {
+        const responseData = response.data;
+        const subjectName = responseData?.data?.subjectName;
+
+        toast.success("Subject added successfully! 🎉", {
+          description: `${subjectName} (${formData.skillLevel}) has been added to your learning list.`
+        });
+
+        // Start topic generation process
+        if (subjectName) {
+          await generateTopics(subjectName);
+        }
+
         // Reset form after successful submission
         setFormData({ subject: "", skillLevel: "" });
         setShowSuggestions(false);
         setSuggestions([]);
         setSelectedSuggestionIndex(-1);
-
-        toast.success("Subject added successfully! 🎉", {
-          description: `${formData.subject} (${formData.skillLevel}) has been added to your learning list.`
-        });
 
         // Call onSuccess callback if provided
         if (onSuccess) {
@@ -234,6 +289,42 @@ export function SubjectForm({ onSuccess }: SubjectFormProps) {
 
   return (
     <div className="flex justify-center items-center min-h-[400px] p-4">
+      {/* Topic Generation Loading Overlay */}
+      {isGeneratingTopics && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="w-full max-w-md mx-4 shadow-2xl border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+            <CardContent className="p-8 text-center">
+              <div className="mx-auto mb-6 w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center relative">
+                <Bot className="w-10 h-10 text-primary animate-pulse" />
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                  <Sparkles className="w-3 h-3 text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  AI Agent Working...
+                </h3>
+
+                <div className="h-16 flex items-center justify-center">
+                  <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed min-h-[3rem] flex items-center">
+                    {topicGenerationStep}
+                  </p>
+                </div>
+
+                <div className="flex justify-center">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Card className="w-full max-w-md shadow-lg border-0 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
         <CardHeader className="text-center pb-6">
           <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
@@ -342,17 +433,22 @@ export function SubjectForm({ onSuccess }: SubjectFormProps) {
             <Button
               type="submit"
               className="w-full h-11 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white font-medium transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isGeneratingTopics}
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Submitting...
+                  Adding Subject...
+                </div>
+              ) : isGeneratingTopics ? (
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 animate-pulse" />
+                  AI Generating Topics...
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-black">
                   <Send className="w-4 h-4" />
-                  Submit Subject
+                  Add Subject & Generate Topics
                 </div>
               )}
             </Button>
