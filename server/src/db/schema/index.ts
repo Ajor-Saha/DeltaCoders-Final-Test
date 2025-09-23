@@ -1,3 +1,4 @@
+export * from './tbl-external-resources';
 export * from './tbl-lessons';
 export * from './tbl-quiz-questions';
 export * from './tbl-quiz-results';

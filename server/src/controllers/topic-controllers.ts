@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
+import { externalResourcesTable } from '../db/schema/tbl-external-resources';
 import { lessonsTable } from '../db/schema/tbl-lessons';
 import { quizQuestionsTable } from '../db/schema/tbl-quiz-questions';
 import { quizzesTable } from '../db/schema/tbl-quizzes';
@@ -723,32 +724,50 @@ Create a comprehensive quiz that tests understanding of the content.`;
 export const getExternalResources = asyncHandler(
   async (req: Request, res: Response) => {
     try {
-      const { subject, topicList } = req.body;
+      const { subjectId } = req.body;
 
-      if (!subject || subject.trim() === '') {
+      if (!subjectId || subjectId.trim() === '') {
         return res
           .status(400)
-          .json(new ApiResponse(400, {}, 'Subject is required'));
+          .json(new ApiResponse(400, {}, 'Subject ID is required'));
       }
 
-      // Validate topicList if provided
-      if (
-        topicList &&
-        (!Array.isArray(topicList) ||
-          topicList.some(
-            topic => typeof topic !== 'string' || topic.trim() === ''
-          ))
-      ) {
+      // Validate subject exists
+      const subjectData = await db
+        .select()
+        .from(subjectsTable)
+        .where(eq(subjectsTable.subjectId, subjectId))
+        .limit(1);
+
+      if (subjectData.length === 0) {
+        return res
+          .status(404)
+          .json(new ApiResponse(404, {}, 'Subject not found'));
+      }
+
+      const subject = subjectData[0];
+
+      // Fetch all topics for this subject
+      const topicsData = await db
+        .select()
+        .from(topicsTable)
+        .where(eq(topicsTable.subjectId, subjectId));
+
+      if (topicsData.length === 0) {
         return res
           .status(400)
           .json(
             new ApiResponse(
               400,
               {},
-              'TopicList must be an array of non-empty strings'
+              'No topics found for this subject. Please add topics first.'
             )
           );
       }
+
+      console.log(
+        `Found ${topicsData.length} topics for subject: ${subject.subjectName}`
+      );
 
       const ai = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
@@ -764,56 +783,18 @@ export const getExternalResources = asyncHandler(
         tools: [groundingTool],
       };
 
-      let topics = [];
+      // Use the topic titles from the database
+      const topics = topicsData.map(topic => topic.title);
 
-      // Use provided topicList or generate topics
-      if (topicList && Array.isArray(topicList) && topicList.length > 0) {
-        console.log('Using provided topic list...');
-        topics = topicList.filter(topic => topic.trim() !== '');
-      } else {
-        // AGENT 1: Generate topics for the subject
-        console.log('Agent 1: Generating topics for the subject...');
-
-        const topicsPrompt = `Generate a comprehensive list of important topics for the subject "${subject}".
-        Focus on key learning areas, fundamental concepts, and advanced topics that students should study.
-        Provide 6-10 main topics that cover the breadth of this subject.`;
-
-        const topicsResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: topicsPrompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                subject: {
-                  type: Type.STRING,
-                },
-                topics: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.STRING,
-                  },
-                },
-              },
-              propertyOrdering: ['subject', 'topics'],
-            },
-          },
-        });
-
-        const topicsData = JSON.parse(topicsResponse.text || '{}');
-        topics = topicsData.topics || [];
-      }
-
-      // AGENT 2: Search for resources for each topic
-      console.log('Agent 2: Searching for resources for each topic...');
+      // AGENT 1: Search for resources for each topic
+      console.log('Agent 1: Searching for resources for each topic...');
 
       const topicResources = [];
 
       for (const topic of topics) {
         console.log(`Searching resources for topic: ${topic}`);
 
-        const resourcePrompt = `Search and verify 2 best educational resources about "${topic}" in the context of "${subject}".
+        const resourcePrompt = `Search and verify 2 best educational resources about "${topic}" in the context of "${subject.subjectName}".
 
         Requirements for resources:
         1. One must be a video from YouTube (make sure the video exists and is accessible)
@@ -854,10 +835,12 @@ export const getExternalResources = asyncHandler(
         });
       }
 
-      // AGENT 3: Structure and organize all resources
-      console.log('Agent 3: Structuring and organizing all resources...');
+      // AGENT 2: Structure and organize all resources
+      console.log('Agent 2: Structuring and organizing all resources...');
 
-      const structurePrompt = `Based on the following search results for different topics under the subject "${subject}", create a well-structured list of external learning resources:
+      const structurePrompt = `Based on the following search results for different topics under the subject "${
+        subject.subjectName
+      }", create a well-structured list of external learning resources:
 
 ${topicResources
   .map(
@@ -869,7 +852,7 @@ ${tr.searchResults}
   .join('\n')}
 
 Please organize these resources into a structured format with the following strict requirements:
-1. Group resources by topic under the subject "${subject}"
+1. Group resources by topic under the subject "${subject.subjectName}"
 2. For each topic, verify and include exactly 2 resources:
    - One high-quality video resource (must be a working YouTube video)
    - One high-quality article/documentation resource (from reputable educational platforms)
@@ -979,11 +962,64 @@ Structure the response as a comprehensive JSON with the subject and all its topi
 
       const structuredResources = JSON.parse(structuredResponseText);
 
+      // AGENT 3: Save resources to database
+      console.log('Agent 3: Saving resources to database...');
+
+      const resourcesToInsert = [];
+
+      for (const topicData of structuredResources.topics || []) {
+        const topicName = topicData.topic_name;
+        const topicDescription = topicData.description || '';
+
+        for (const resource of topicData.resources || []) {
+          // Map difficulty to match our enum
+          let difficulty = 'beginner';
+          if (resource.difficulty) {
+            const diff = resource.difficulty.toLowerCase();
+            if (diff.includes('intermediate') || diff.includes('medium')) {
+              difficulty = 'intermediate';
+            } else if (diff.includes('advanced') || diff.includes('hard')) {
+              difficulty = 'advanced';
+            }
+          }
+
+          resourcesToInsert.push({
+            resourceId: uuidv4(),
+            subjectId,
+            topicName,
+            description: topicDescription,
+            resourceTitle: resource.title || 'Untitled Resource',
+            url: resource.url || '',
+            type: resource.type || 'other',
+            source: resource.source || 'Unknown',
+            difficulty: difficulty as 'beginner' | 'intermediate' | 'advanced',
+          });
+        }
+      }
+
+      // Insert resources into database
+      let savedResources: any[] = [];
+      if (resourcesToInsert.length > 0) {
+        try {
+          savedResources = await db
+            .insert(externalResourcesTable)
+            .values(resourcesToInsert)
+            .returning();
+
+          console.log(
+            `Saved ${savedResources.length} external resources to database`
+          );
+        } catch (dbError) {
+          console.error('Error saving resources to database:', dbError);
+          // Continue with the response even if database save fails
+        }
+      }
+
       // Add timestamp and enhance metadata
       const enhancedResources = {
         ...structuredResources,
-        subject: subject,
-        search_timestamp: new Date().toISOString(),
+        subject: subject.subjectName,
+        subject_id: subjectId,
         total_topics: structuredResources.topics?.length || 0,
         total_resources:
           structuredResources.topics?.reduce(
@@ -991,18 +1027,14 @@ Structure the response as a comprehensive JSON with the subject and all its topi
               total + (topic.resources?.length || 0),
             0
           ) || 0,
+        saved_to_database: savedResources.length,
         search_metadata: {
-          agents_used:
-            topicList && Array.isArray(topicList) && topicList.length > 0
-              ? ['resource_search', 'structuring']
-              : ['topic_generation', 'resource_search', 'structuring'],
-          topics_source:
-            topicList && Array.isArray(topicList) && topicList.length > 0
-              ? 'provided_by_user'
-              : 'generated_by_ai',
+          agents_used: ['resource_search', 'structuring', 'database_storage'],
+          topics_source: 'fetched_from_database',
           search_date: new Date().toDateString(),
           grounding_enabled: true,
           processing_time: 'Multi-agent workflow completed',
+          database_integration: true,
         },
       };
 
@@ -1012,15 +1044,7 @@ Structure the response as a comprehensive JSON with the subject and all its topi
           new ApiResponse(
             200,
             enhancedResources,
-            `External resources found and structured successfully for subject: ${subject} with ${
-              enhancedResources.total_topics
-            } topics and ${
-              enhancedResources.total_resources
-            } resources. Topics were ${
-              topicList && Array.isArray(topicList) && topicList.length > 0
-                ? 'provided by user'
-                : 'generated by AI'
-            }.`
+            `External resources found and saved successfully for subject: ${subject.subjectName} with ${enhancedResources.total_topics} topics and ${enhancedResources.total_resources} resources. ${savedResources.length} resources saved to database.`
           )
         );
     } catch (error) {

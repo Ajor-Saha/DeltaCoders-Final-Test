@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import logger from 'morgan';
 import user_router from './routes/auth-route';
+import question_router from './routes/question-route';
 import subject_router from './routes/subject-route';
 import topic_router from './routes/topic-route';
 
@@ -29,6 +30,8 @@ app.use('/api/auth', user_router);
 app.use('/api/subject', subject_router);
 // Mount topic router
 app.use('/api/topic', topic_router);
+// Mount question router
+app.use('/api/question', question_router);
 
 app.get('/', (req, res) => {
   res.send('Company & task server is running');
