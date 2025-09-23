@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGameAnalytics } from "@/hooks/useGameAnalytics";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -21,6 +22,21 @@ import {
   Zap
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AnalyzingLoader } from "./AnalyzingLoader";
+import { TraitsDisplay } from "./TraitsDisplay";
+
+interface StressObjectType {
+  id: string;
+  emoji: string;
+  icon: React.ElementType;
+  points: number;
+  speed: number;
+  size: number;
+  comboBoost?: number;
+  color: string; // hex/rgb for canvas drawing
+  satisfactionLevel: number; // 1-10 how satisfying to smash
+  spawnWeight: number; // weighted spawn probability
+}
 
 interface StressObject {
   id: number;
@@ -28,36 +44,25 @@ interface StressObject {
   y: number;
   vx: number;
   vy: number;
-  type: ObjectType;
+  type: StressObjectType;
   alive: boolean;
   age: number;
   rotation: number;
   size: number;
+  pulsePhase: number;
+  wobble: number;
 }
 
 interface Particle {
   id: number;
   x: number;
   y: number;
-  dx: number;
-  dy: number;
-  text: string;
-  life: number;
-  startTime: number;
-  alpha: number;
-  size: number;
-}
-
-interface ObjectType {
-  id: string;
-  emoji: string;
-  icon: React.ElementType;
-  points: number;
-  life: number;
-  speed: number;
-  size: number;
-  comboBoost?: number;
+  vx: number;
+  vy: number;
+  life: number; // seconds remaining
+  maxLife: number; // seconds
   color: string;
+  size: number;
 }
 
 interface GameState {
@@ -72,57 +77,66 @@ interface GameState {
   difficulty: string;
   bestScore: number | null;
   currentLevel: number;
+  stressRelief?: number; // 0-100, for effects
 }
 
-const objectTypes: Record<string, ObjectType> = {
-  bug: {
+// Weighted stress object types (colors in hex for canvas)
+const stressObjectTypes: StressObjectType[] = [
+  {
     id: "bug",
     emoji: "🐞",
     icon: Bug,
     points: 10,
-    life: 0,
-    speed: 0.6,
+    speed: 80,
     size: 34,
-    color: "text-green-500"
+    color: "#22c55e",
+    satisfactionLevel: 9,
+    spawnWeight: 3,
+    comboBoost: 1.15,
   },
-  error: {
+  {
     id: "error",
     emoji: "❗",
     icon: AlertTriangle,
     points: 25,
-    life: 0,
-    speed: 1.1,
+    speed: 70,
     size: 40,
-    color: "text-red-500"
+    color: "#ef4444",
+    satisfactionLevel: 10,
+    spawnWeight: 3,
+    comboBoost: 1.2,
   },
-  deadline: {
+  {
     id: "deadline",
     emoji: "⏰",
     icon: Clock,
     points: -15,
-    life: -1,
-    speed: 1.6,
+    speed: 90,
     size: 44,
-    color: "text-orange-500"
+    color: "#f59e0b",
+    satisfactionLevel: 3,
+    spawnWeight: 3,
   },
-  email: {
+  {
     id: "email",
     emoji: "📧",
     icon: Mail,
     points: 15,
-    life: 0,
-    speed: 0.9,
+    speed: 85,
     size: 36,
+    color: "#3b82f6",
+    satisfactionLevel: 6,
+    spawnWeight: 4,
     comboBoost: 1.2,
-    color: "text-blue-500"
-  }
-};
+  },
+];
 
-interface StressSmashGameProps {
+interface BugSmashGameProps {
   onBackToGames: () => void;
 }
 
-export default function StressSmashGame({ onBackToGames }: StressSmashGameProps) {
+export default function BugSmashGame({ onBackToGames }: BugSmashGameProps) {
+  const { startSession, trackAction, trackError, endSession, traits, isAnalyzing, sessionActive } = useGameAnalytics('bug-smash');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
@@ -142,7 +156,8 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     gameOver: false,
     difficulty: "normal",
     bestScore: null,
-    currentLevel: 1
+    currentLevel: 1,
+    stressRelief: 0,
   });
 
   const [objects, setObjects] = useState<StressObject[]>([]);
@@ -152,26 +167,53 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
   const canvasWidth = 600;
   const canvasHeight = 400;
 
-  // Utility functions
   const rand = (a: number, b: number) => a + Math.random() * (b - a);
   const choose = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  // Show temporary message
   const showMessage = useCallback((text: string) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 1500);
   }, []);
 
-  // Create stress object
   const createStressObject = useCallback((): StressObject => {
-    const x = rand(60, canvasWidth - 60);
-    const y = canvasHeight + 40;
-    const angle = rand(-0.6, -1.5);
-    const typeKeys = Object.keys(objectTypes);
-    const type = objectTypes[choose(typeKeys)];
-    const speed = type.speed * (1 + Math.random() * 0.6);
-    const vx = Math.cos(angle) * speed * 60;
-    const vy = Math.sin(angle) * speed * 60;
+    // Weighted random selection
+    const totalWeight = stressObjectTypes.reduce((sum, t) => sum + t.spawnWeight, 0);
+    let r = Math.random() * totalWeight;
+    let selected = stressObjectTypes[0];
+    for (const t of stressObjectTypes) {
+      r -= t.spawnWeight;
+      if (r <= 0) { selected = t; break; }
+    }
+
+    // Spawn from edges with directional velocity
+    const spawnSide = Math.floor(Math.random() * 4);
+    let x = 0, y = 0, vx = 0, vy = 0;
+    switch (spawnSide) {
+      case 0: // Top
+        x = Math.random() * canvasWidth;
+        y = -selected.size;
+        vx = (Math.random() - 0.5) * 50;
+        vy = selected.speed + Math.random() * 30;
+        break;
+      case 1: // Right
+        x = canvasWidth + selected.size;
+        y = Math.random() * canvasHeight;
+        vx = -(selected.speed + Math.random() * 30);
+        vy = (Math.random() - 0.5) * 50;
+        break;
+      case 2: // Bottom
+        x = Math.random() * canvasWidth;
+        y = canvasHeight + selected.size;
+        vx = (Math.random() - 0.5) * 50;
+        vy = -(selected.speed + Math.random() * 30);
+        break;
+      default: // Left
+        x = -selected.size;
+        y = Math.random() * canvasHeight;
+        vx = selected.speed + Math.random() * 30;
+        vy = (Math.random() - 0.5) * 50;
+        break;
+    }
 
     return {
       id: objectIdRef.current++,
@@ -179,233 +221,198 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
       y,
       vx,
       vy,
-      type,
+      type: selected,
       alive: true,
       age: 0,
-      rotation: rand(-0.6, 0.6),
-      size: type.size
+      rotation: Math.random() * Math.PI * 2,
+      size: selected.size,
+      pulsePhase: Math.random() * Math.PI * 2,
+      wobble: Math.random() * 0.02 + 0.01,
     };
   }, []);
 
-  // Create particle effect
-  const createParticle = useCallback((x: number, y: number): Particle => {
-    const angle = rand(0, Math.PI * 2);
-    const speed = rand(80, 260);
-    const effects = ["✨", "💥", "⭐", "+"];
-
+  const createParticle = useCallback((x: number, y: number, color: string): Particle => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 200 + 100;
     return {
       id: particleIdRef.current++,
       x,
       y,
-      dx: Math.cos(angle) * speed,
-      dy: Math.sin(angle) * speed,
-      text: choose(effects),
-      life: 700,
-      startTime: Date.now(),
-      alpha: 1,
-      size: rand(12, 20)
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      maxLife: 1,
+      color,
+      size: Math.random() * 8 + 4,
     };
   }, []);
 
-  // Smash object
-  const smashObject = useCallback((object: StressObject) => {
-    if (!object.alive) return;
+  // smashObject removed: click handler will implement StressSmash scoring/FX inline
 
-    setGameState(prev => {
-      let newScore = prev.score;
-      let newLives = prev.lives;
-      let newCombo = prev.combo;
-      let newComboTimer = prev.comboTimer;
-
-      if (object.type.points < 0) {
-        // Negative object: give some points back for clicking
-        newScore += Math.max(-10, object.type.points + 10);
-      } else {
-        // Good smash
-        newScore += Math.round(object.type.points * newCombo);
-        newCombo = Math.min(10, newCombo * (object.type.comboBoost || 1.05));
-        newComboTimer = 2000; // 2s to continue combo
-      }
-
-      // Email combo boost
-      if (object.type.comboBoost) {
-        newCombo = Math.min(12, newCombo * object.type.comboBoost);
-        showMessage("Combo Boost!");
-      } else {
-        showMessage("SMASH!");
-      }
-
-      // Update best score
-      const newBestScore = prev.bestScore === null || newScore > prev.bestScore ? newScore : prev.bestScore;
-
-      return {
-        ...prev,
-        score: newScore,
-        lives: newLives,
-        combo: newCombo,
-        comboTimer: newComboTimer,
-        bestScore: newBestScore
-      };
-    });
-
-    // Create particles
-    setParticles(prev => [
-      ...prev,
-      ...Array.from({ length: 8 }, () => createParticle(object.x, object.y))
-    ]);
-
-    // Play sound effect (simple beep)
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 500 + Math.random() * 600;
-      oscillator.type = 'sawtooth';
-      gainNode.gain.value = 0.1;
-
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
-      oscillator.stop(audioContext.currentTime + 0.1);
-    } catch (e) {
-      // Audio not supported
-    }
-
-    // Vibration for mobile
-    if (navigator.vibrate) {
-      navigator.vibrate(20);
-    }
-  }, [createParticle, showMessage]);
-
-  // Handle canvas click
-  const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!gameState.running || gameState.paused) return;
-
+  const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Background gradient reacts to stress relief if present
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    const relief = gameState.stressRelief ?? 0;
+    const gradient = ctx.createRadialGradient(
+      canvasWidth/2, canvasHeight/2, 0,
+      canvasWidth/2, canvasHeight/2, canvasWidth/2
+    );
+    gradient.addColorStop(0, `rgba(20, 184, 166, ${0.05 + relief * 0.001})`);
+    gradient.addColorStop(1, 'rgba(15, 118, 110, 0.02)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Draw objects with pulsing glow
+    objects.forEach(obj => {
+      if (!obj.alive) return;
+      ctx.save();
+      ctx.translate(obj.x, obj.y);
+      ctx.rotate(obj.rotation);
+      const pulseScale = 1 + Math.sin(obj.pulsePhase || 0) * 0.1;
+      ctx.scale(pulseScale, pulseScale);
+
+      // Shadow glow
+      ctx.shadowColor = obj.type.color;
+      ctx.shadowBlur = 10 + Math.sin(obj.pulsePhase || 0) * 5;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+
+      // Background circle
+      ctx.fillStyle = obj.type.color + '20';
+      ctx.beginPath();
+      ctx.arc(0, 0, obj.size * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Emoji
+      ctx.shadowColor = 'transparent';
+      ctx.font = `${obj.size}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(obj.type.emoji, 0, 0);
+      ctx.restore();
+    });
+
+    // Draw particles as fading circles
+    particles.forEach(p => {
+      const alpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }, [objects, particles]);
+
+  const handleCanvasClick = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!gameState.running || gameState.paused) return;
+    event.preventDefault();
+    trackAction();
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    // Find ALL objects under click location
     let hitAnyObject = false;
+    let totalSatisfaction = 0;
+    const clickedObjects: StressObject[] = [];
 
     setObjects(prev => {
-      const clickedObjects: StressObject[] = [];
-      const remainingObjects: StressObject[] = [];
-
+      const remaining: StressObject[] = [];
       prev.forEach(obj => {
         const dx = x - obj.x;
         const dy = y - obj.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < obj.size * 0.8 && obj.alive) {
+        if (distance < obj.size * 0.9 && obj.alive) {
+          obj.alive = false;
           clickedObjects.push(obj);
           hitAnyObject = true;
+          totalSatisfaction += obj.type.satisfactionLevel;
+          const particleCount = Math.min(15, Math.max(8, obj.type.satisfactionLevel));
+          setParticles(prevP => ([
+            ...prevP,
+            ...Array.from({ length: particleCount }, () => createParticle(obj.x, obj.y, obj.type.color))
+          ]));
+        } else if (obj.alive) {
+          remaining.push(obj);
+        }
+      });
+      return remaining;
+    });
+
+    if (clickedObjects.length > 0) {
+      let totalPoints = 0;
+      let comboMultiplier = gameState.combo;
+      clickedObjects.forEach(obj => {
+        if (obj.type.points < 0) {
+          totalPoints += Math.max(-10, obj.type.points + 5);
+          setTimeout(() => trackError(), 0);
         } else {
-          remainingObjects.push(obj);
+          totalPoints += Math.round(obj.type.points * comboMultiplier);
+          if (obj.type.comboBoost) {
+            comboMultiplier = Math.min(10, comboMultiplier * obj.type.comboBoost);
+          } else {
+            comboMultiplier = Math.min(10, comboMultiplier * 1.05);
+          }
         }
       });
 
-      // Process all clicked objects for scoring and effects
-      if (clickedObjects.length > 0) {
-        clickedObjects.forEach(obj => {
-          // Process each object individually for scoring
-          setGameState(prevState => {
-            let newScore = prevState.score;
-            let newLives = prevState.lives;
-            let newCombo = prevState.combo;
-            let newComboTimer = prevState.comboTimer;
+      setGameState(prev => {
+        const newScore = prev.score + totalPoints;
+        const newBest = prev.bestScore === null || newScore > prev.bestScore ? newScore : prev.bestScore;
+        return {
+          ...prev,
+          score: newScore,
+          combo: comboMultiplier,
+          comboTimer: 3000,
+          bestScore: newBest,
+          stressRelief: Math.min(100, (prev.stressRelief ?? 0) + totalSatisfaction),
+        };
+      });
 
-            if (obj.type.points < 0) {
-              // Negative object: give some points back for clicking
-              newScore += Math.max(-10, obj.type.points + 10);
-            } else {
-              // Good smash
-              newScore += Math.round(obj.type.points * newCombo);
-              newCombo = Math.min(10, newCombo * (obj.type.comboBoost || 1.05));
-              newComboTimer = 2000; // 2s to continue combo
-            }
-
-            // Email combo boost
-            if (obj.type.comboBoost) {
-              newCombo = Math.min(12, newCombo * obj.type.comboBoost);
-            }
-
-            // Update best score
-            const newBestScore = prevState.bestScore === null || newScore > prevState.bestScore ? newScore : prevState.bestScore;
-
-            return {
-              ...prevState,
-              score: newScore,
-              lives: newLives,
-              combo: newCombo,
-              comboTimer: newComboTimer,
-              bestScore: newBestScore
-            };
-          });
-
-          // Create particles for each smashed object
-          setParticles(prevParticles => [
-            ...prevParticles,
-            ...Array.from({ length: 8 }, () => createParticle(obj.x, obj.y))
-          ]);
-        });
-
-        // Show message and play effects
-        if (clickedObjects.length > 1) {
-          showMessage(`${clickedObjects.length}x SMASH!`);
-        } else if (clickedObjects[0]?.type.comboBoost) {
-          showMessage("Combo Boost!");
-        } else {
-          showMessage("SMASH!");
-        }
-
-        // Play sound effect
-        try {
-          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
-
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-
-          oscillator.frequency.value = 500 + Math.random() * 600;
-          oscillator.type = 'sawtooth';
-          gainNode.gain.value = 0.1 * Math.min(clickedObjects.length, 3); // Louder for multiple hits
-
-          oscillator.start();
-          gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
-          oscillator.stop(audioContext.currentTime + 0.1);
-        } catch (e) {
-          // Audio not supported
-        }
-
-        // Vibration for mobile
-        if (navigator.vibrate) {
-          navigator.vibrate(20 * Math.min(clickedObjects.length, 3));
-        }
-
-        return remainingObjects;
+      if (clickedObjects.length > 1) {
+        showMessage(`${clickedObjects.length}x SMASH COMBO! +${totalPoints} 💥`);
+      } else if (totalPoints > 0) {
+        const s = clickedObjects[0].type.satisfactionLevel;
+        showMessage(s >= 9 ? `ULTRA SMASH! +${totalPoints} ⚡` : s >= 7 ? `GREAT SMASH! +${totalPoints} 💥` : `SMASHED! +${totalPoints} 👊`);
+      } else {
+        showMessage(`OOPS! ${totalPoints} 😰`);
       }
 
-      return prev;
-    });
+      // Audio FX
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const avgS = totalSatisfaction / clickedObjects.length;
+        for (let i = 0; i < Math.min(clickedObjects.length, 3); i++) {
+          const osc = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          osc.connect(gain); gain.connect(audioContext.destination);
+          osc.frequency.value = 200 + (avgS * 30) + (i * 100);
+          osc.type = avgS >= 8 ? 'sawtooth' : 'square';
+          gain.gain.value = Math.min(0.1, 0.05 + (avgS * 0.005));
+          osc.start(audioContext.currentTime + i * 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2 + i * 0.02);
+          osc.stop(audioContext.currentTime + 0.2 + i * 0.02);
+        }
+      } catch {}
 
-    // Handle missed click outside the objects forEach to avoid state conflicts
-    if (!hitAnyObject) {
-      setGameState(prevState => ({
-        ...prevState,
-        combo: Math.max(1, prevState.combo * 0.95)
-      }));
+      // Haptics
+      if (navigator.vibrate) {
+        if (clickedObjects.length > 1) navigator.vibrate([30, 10, 30, 10, 30]);
+        else navigator.vibrate(Math.min(50, totalSatisfaction * 5));
+      }
+    } else {
+      trackError();
+      setGameState(prev => ({ ...prev, combo: Math.max(1, prev.combo * 0.95) }));
     }
-  }, [gameState.running, gameState.paused, createParticle, showMessage]);
+  }, [gameState.running, gameState.paused, gameState.combo, createParticle, showMessage, trackAction, trackError]);
 
-  // Game loop
   const gameLoop = useCallback((timestamp: number) => {
     if (!gameState.running || gameState.paused) {
       lastFrameRef.current = timestamp;
@@ -416,7 +423,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     const deltaTime = timestamp - lastFrameRef.current;
     lastFrameRef.current = timestamp;
 
-    // Update game state
     setGameState(prev => {
       let newComboTimer = Math.max(0, prev.comboTimer - deltaTime);
       let newCombo = prev.combo;
@@ -446,7 +452,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
       };
     });
 
-    // Spawn objects
     lastSpawnRef.current += deltaTime;
     if (lastSpawnRef.current > spawnIntervalRef.current) {
       setObjects(prev => [...prev, createStressObject()]);
@@ -454,97 +459,37 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
       spawnIntervalRef.current = Math.max(360, spawnIntervalRef.current * 0.985);
     }
 
-    // Update objects
     setObjects(prev => prev.filter(obj => {
+      if (!obj.alive) return false;
       obj.age += deltaTime;
       obj.x += (obj.vx * deltaTime) / 1000;
       obj.y += (obj.vy * deltaTime) / 1000;
-      obj.rotation += 0.02;
+      obj.rotation += obj.wobble || 0.02;
+      obj.pulsePhase = (obj.pulsePhase || 0) + deltaTime * 0.005;
 
-      // Remove objects that go off screen
-      if (obj.y < -80 || obj.x < -100 || obj.x > canvasWidth + 100) {
-        // Penalty for deadline objects that escape
+      const margin = 100;
+      if (obj.x < -margin || obj.x > canvasWidth + margin || obj.y < -margin || obj.y > canvasHeight + margin) {
         if (obj.type.id === "deadline" && obj.alive) {
-          setGameState(prevState => ({
-            ...prevState,
-            lives: Math.max(0, prevState.lives - 1)
-          }));
+          setGameState(prevState => ({ ...prevState, lives: Math.max(0, prevState.lives - 1) }));
           showMessage("-1 Life!");
+          setTimeout(() => trackError(), 0);
         }
         return false;
       }
       return true;
     }));
 
-    // Update particles
-    setParticles(prev => prev.filter(particle => {
-      const age = Date.now() - particle.startTime;
-      if (age > particle.life) return false;
-
-      particle.x += (particle.dx * deltaTime) / 1000;
-      particle.y += (particle.dy * deltaTime) / 1000;
-      particle.alpha = 1 - age / particle.life;
-      particle.dy += (280 * deltaTime) / 1000; // gravity
-
-      return true;
+    setParticles(prev => prev.filter(p => {
+      p.life -= deltaTime / 1000;
+      p.x += (p.vx * deltaTime) / 1000;
+      p.y += (p.vy * deltaTime) / 1000;
+      p.vy += 200 * deltaTime / 1000; // gravity
+      return p.life > 0;
     }));
 
     animationRef.current = requestAnimationFrame(gameLoop);
-  }, [gameState.running, gameState.paused, createStressObject, showMessage]);
+  }, [gameState.running, gameState.paused, createStressObject, showMessage, trackError]);
 
-  // Canvas drawing
-  const drawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    // Background
-    ctx.fillStyle = 'rgba(20, 184, 166, 0.05)';
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    // Draw objects
-    objects.forEach(obj => {
-      ctx.save();
-      ctx.translate(obj.x, obj.y);
-      ctx.rotate(obj.rotation);
-
-      // Shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-      ctx.beginPath();
-      ctx.ellipse(0, obj.size * 0.3, obj.size * 0.6, obj.size * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Background circle
-      ctx.fillStyle = 'rgba(20, 184, 166, 0.1)';
-      ctx.beginPath();
-      ctx.arc(0, 0, obj.size * 0.6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Emoji
-      ctx.font = `${obj.size}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(obj.type.emoji, 0, 0);
-      ctx.restore();
-    });
-
-    // Draw particles
-    particles.forEach(particle => {
-      ctx.save();
-      ctx.globalAlpha = particle.alpha;
-      ctx.font = `${particle.size}px serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(particle.text, particle.x, particle.y);
-      ctx.restore();
-    });
-  }, [objects, particles]);
-
-  // Game controls
   const startGame = useCallback(() => {
     setGameState(prev => ({
       ...prev,
@@ -563,7 +508,8 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     spawnIntervalRef.current = 900;
     lastFrameRef.current = performance.now();
     showMessage("Go!");
-  }, [showMessage]);
+    startSession();
+  }, [showMessage, startSession]);
 
   const pauseGame = useCallback(() => {
     setGameState(prev => ({
@@ -580,10 +526,9 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     startGame();
   }, [startGame]);
 
-  // Effects
   useEffect(() => {
     drawCanvas();
-  }, [drawCanvas]);
+  }, [drawCanvas, objects, particles]);
 
   useEffect(() => {
     if (gameState.running && !gameState.paused) {
@@ -596,7 +541,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     };
   }, [gameState.running, gameState.paused, gameLoop]);
 
-  // Keyboard controls
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -613,6 +557,12 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [gameState.running, startGame, resetGame, pauseGame]);
 
+  useEffect(() => {
+    if (gameState.gameOver && sessionActive) {
+      endSession(gameState.score);
+    }
+  }, [gameState.gameOver, gameState.score, sessionActive, endSession]);
+
   const formatTime = (seconds: number) => {
     return Math.ceil(Math.max(0, seconds));
   };
@@ -620,45 +570,25 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-gray-900 dark:to-teal-900 p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <motion.div
-          className="mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div className="mb-6" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-gradient-to-r from-teal-400 to-teal-600 rounded-xl">
                 <Zap className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Stress Smash
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Smash stress objects to relieve pressure and score points!
-                </p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bug Smash</h1>
+                <p className="text-gray-600 dark:text-gray-400">Smash bugs and errors for points—watch out for deadlines!</p>
               </div>
             </div>
-            <Button
-              onClick={onBackToGames}
-              variant="outline"
-              className="border-teal-200 hover:bg-teal-50"
-            >
+            <Button onClick={onBackToGames} variant="outline" className="border-teal-200 hover:bg-teal-50">
               <Home className="h-4 w-4 mr-2" />
               Back to Games
             </Button>
           </div>
         </motion.div>
 
-        {/* Main Game Layout */}
-        <motion.div
-          className="grid grid-cols-1 lg:grid-cols-4 gap-6"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {/* Game Area - Takes up 3 columns */}
+        <motion.div className="grid grid-cols-1 lg:grid-cols-4 gap-6" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
           <div className="lg:col-span-3">
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur h-full">
               <CardHeader className="pb-4">
@@ -667,8 +597,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                     <Target className="h-5 w-5 text-teal-600" />
                     Gaming Zone
                   </CardTitle>
-
-                  {/* Game Controls */}
                   <div className="flex gap-2">
                     <Button
                       onClick={startGame}
@@ -679,7 +607,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                       <Play className="h-3 w-3 mr-1" />
                       {gameState.running ? "Playing..." : "Start"}
                     </Button>
-
                     {gameState.running && (
                       <Button
                         onClick={pauseGame}
@@ -691,7 +618,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                         {gameState.paused ? "Resume" : "Pause"}
                       </Button>
                     )}
-
                     <Button
                       onClick={resetGame}
                       variant="outline"
@@ -704,7 +630,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                   </div>
                 </div>
               </CardHeader>
-
               <CardContent className="p-6">
                 <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-4 rounded-xl shadow-inner">
                   <canvas
@@ -719,8 +644,6 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                       aspectRatio: `${canvasWidth}/${canvasHeight}`
                     }}
                   />
-
-                  {/* Message Overlay */}
                   <AnimatePresence>
                     {message && (
                       <motion.div
@@ -737,10 +660,7 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
               </CardContent>
             </Card>
           </div>
-
-          {/* Statistics Panel - Takes up 1 column */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Game Stats */}
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -751,49 +671,33 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
               <CardContent className="space-y-4">
                 <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
                   <Trophy className="h-8 w-8 mx-auto mb-2 text-teal-600" />
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                    {Math.max(0, gameState.score)}
-                  </div>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{Math.max(0, gameState.score)}</div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">Current Score</div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <Heart className="h-6 w-6 mx-auto mb-1 text-red-500" />
-                    <div className="text-xl font-bold text-gray-900 dark:text-white">
-                      {gameState.lives}
-                    </div>
+                    <div className="text-xl font-bold text-gray-900 dark:text-white">{gameState.lives}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Lives</div>
                   </div>
-
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <Star className="h-6 w-6 mx-auto mb-1 text-yellow-500" />
-                    <div className="text-xl font-bold text-gray-900 dark:text-white">
-                      {gameState.combo.toFixed(1)}x
-                    </div>
+                    <div className="text-xl font-bold text-gray-900 dark:text-white">{gameState.combo.toFixed(1)}x</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Combo</div>
                   </div>
-
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <Timer className="h-6 w-6 mx-auto mb-1 text-teal-600" />
-                    <div className="text-xl font-bold text-gray-900 dark:text-white">
-                      {formatTime(gameState.timeLeft)}
-                    </div>
+                    <div className="text-xl font-bold text-gray-900 dark:text-white">{formatTime(gameState.timeLeft)}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Time</div>
                   </div>
-
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <Trophy className="h-6 w-6 mx-auto mb-1 text-yellow-600" />
-                    <div className="text-xl font-bold text-gray-900 dark:text-white">
-                      {gameState.bestScore || '--'}
-                    </div>
+                    <div className="text-xl font-bold text-gray-900 dark:text-white">{gameState.bestScore || '--'}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400">Best</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* How to Play */}
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -807,23 +711,19 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
                     <Bug className="h-4 w-4 text-green-500" />
                     <span>🐞 Bug (+10 pts)</span>
                   </div>
-
                   <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
                     <span>❗ Error (+25 pts)</span>
                   </div>
-
                   <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded">
                     <Clock className="h-4 w-4 text-orange-500" />
                     <span>⏰ Deadline (-1 life)</span>
                   </div>
-
                   <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
                     <Mail className="h-4 w-4 text-blue-500" />
                     <span>📧 Email (combo boost)</span>
                   </div>
                 </div>
-
                 <div className="mt-4 p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
                   <h4 className="font-semibold text-sm mb-2">Pro Tips:</h4>
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
@@ -838,59 +738,70 @@ export default function StressSmashGame({ onBackToGames }: StressSmashGameProps)
           </div>
         </motion.div>
 
-        {/* Game Over Modal */}
         <AnimatePresence>
           {gameState.gameOver && (
             <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4"
+                className="max-w-md w-full"
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Trophy className="h-8 w-8 text-white" />
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {gameState.lives <= 0 ? "💀 Out of Lives!" : "⏰ Time's Up!"}
-                  </h2>
-
-                  <div className="text-gray-600 dark:text-gray-400 mb-4 space-y-1">
-                    <p>Final Score: {Math.max(0, gameState.score)}</p>
-                    <p>Best Combo: {gameState.combo.toFixed(1)}x</p>
-                    {gameState.bestScore && (
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        {gameState.score >= gameState.bestScore ? "New Best Score!" : `Best: ${gameState.bestScore}`}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3 justify-center">
-                    <Button
-                      onClick={resetGame}
-                      className="bg-gradient-to-r from-teal-400 to-teal-600 text-white"
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Play Again
-                    </Button>
-
-                    <Button
-                      onClick={onBackToGames}
-                      variant="outline"
-                      className="border-teal-200 hover:bg-teal-50"
-                    >
-                      <Home className="h-4 w-4 mr-2" />
-                      Menu
-                    </Button>
-                  </div>
-                </div>
+                {isAnalyzing ? (
+                  <AnalyzingLoader />
+                ) : traits ? (
+                  <TraitsDisplay
+                    traits={traits}
+                    gameName="bug-smash"
+                    score={Math.max(0, gameState.score)}
+                    onPlayAgain={resetGame}
+                    onBackToMenu={onBackToGames}
+                  />
+                ) : (
+                  <Card className="bg-white dark:bg-gray-800">
+                    <CardContent className="p-8">
+                      <div className="text-center">
+                        <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Trophy className="h-8 w-8 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                          {gameState.lives <= 0 ? "💀 Out of Lives!" : "⏰ Time's Up!"}
+                        </h2>
+                        <div className="text-gray-600 dark:text-gray-400 mb-4 space-y-1">
+                          <p>Final Score: {Math.max(0, gameState.score)}</p>
+                          <p>Best Combo: {gameState.combo.toFixed(1)}x</p>
+                          {gameState.bestScore && (
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              {gameState.score >= gameState.bestScore ? "New Best Score!" : `Best: ${gameState.bestScore}`}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-3 justify-center">
+                          <Button
+                            onClick={resetGame}
+                            className="bg-gradient-to-r from-teal-400 to-teal-600 text-white"
+                          >
+                            <Play className="h-4 w-4 mr-2" />
+                            Play Again
+                          </Button>
+                          <Button
+                            onClick={onBackToGames}
+                            variant="outline"
+                            className="border-teal-200 hover:bg-teal-50"
+                          >
+                            <Home className="h-4 w-4 mr-2" />
+                            Menu
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </motion.div>
             </motion.div>
           )}

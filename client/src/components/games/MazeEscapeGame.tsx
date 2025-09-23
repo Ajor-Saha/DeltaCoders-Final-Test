@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGameAnalytics } from "@/hooks/useGameAnalytics";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
@@ -19,6 +20,8 @@ import {
   Trophy
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnalyzingLoader } from "./AnalyzingLoader";
+import { TraitsDisplay } from "./TraitsDisplay";
 
 interface Cell {
   x: number;
@@ -90,6 +93,17 @@ interface MazeEscapeGameProps {
 }
 
 export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
+  // Game Analytics Hook
+  const {
+    startSession,
+    trackAction,
+    trackError,
+    endSession,
+    traits,
+    isAnalyzing,
+    sessionActive
+  } = useGameAnalytics('maze-escape');
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>({
     grid: [],
@@ -246,6 +260,7 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
   }, [gameState.grid, gameState.player, gameState.exit, cellSize]);
 
   const initGame = useCallback(() => {
+    startSession();
     const grid = generateMaze();
     const exit = {
       x: currentDifficulty.cols - 1,
@@ -267,6 +282,8 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
 
   const movePlayer = useCallback((dx: number, dy: number) => {
     if (!gameState.isPlaying) return;
+    // Count an action attempt
+    trackAction();
 
     setGameState(prev => {
       const newX = prev.player.x + dx;
@@ -282,7 +299,10 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
       else if (dx === 0 && dy === 1 && !cell.walls.bottom) canMove = true;
       else if (dx === -1 && dy === 0 && !cell.walls.left) canMove = true;
 
-      if (!canMove) return prev;
+      if (!canMove) {
+        trackError();
+        return prev;
+      }
 
       const newPlayer = { x: newX, y: newY };
       const newMoves = prev.moves + 1;
@@ -348,6 +368,8 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
     const timer = setInterval(() => {
       setGameState(prev => {
         if (prev.timer <= 1) {
+          // Count timeout as an error
+          trackError();
           return {
             ...prev,
             timer: 0,
@@ -362,6 +384,17 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
 
     return () => clearInterval(timer);
   }, [gameState.isPlaying]);
+
+  // End analytics session on game over
+  useEffect(() => {
+    if (gameState.isGameOver && sessionActive) {
+      // Use a simple score proxy: higher remaining time and fewer moves are better
+      const timeBonus = Math.max(0, gameState.timer);
+      const movePenalty = gameState.moves;
+      const score = (gameState.hasWon ? 1000 : 0) + timeBonus * 5 - movePenalty * 2;
+      endSession(score);
+    }
+  }, [gameState.isGameOver, gameState.timer, gameState.moves, gameState.hasWon, sessionActive, endSession]);
 
   // Keyboard controls
   useEffect(() => {
@@ -649,7 +682,7 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
           </motion.div>
         )}
 
-        {/* Game Over Modal */}
+        {/* Game Over Modal with Analytics */}
         <AnimatePresence>
           {gameState.isGameOver && (
             <motion.div
@@ -659,54 +692,60 @@ export default function MazeEscapeGame({ onBackToGames }: MazeEscapeGameProps) {
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4"
+                className="max-w-md w-full mx-4"
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    {gameState.hasWon ? (
-                      <Trophy className="h-8 w-8 text-white" />
-                    ) : (
-                      <Timer className="h-8 w-8 text-white" />
-                    )}
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {gameState.hasWon ? "🎉 You Escaped!" : "⏰ Time's Up!"}
-                  </h2>
-
-                  <div className="text-gray-600 dark:text-gray-400 mb-4 space-y-1">
-                    <p>Moves: {gameState.moves}</p>
-                    <p>Time: {formatTime(currentDifficulty.timeLimit - gameState.timer)}</p>
-                    {gameState.hasWon && (
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        Maze Completed!
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3 justify-center">
-                    <Button
-                      onClick={resetGame}
-                      variant="outline"
-                      className="border-teal-200 hover:bg-teal-50"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Play Again
-                    </Button>
-
-                    <Button
-                      onClick={onBackToGames}
-                      variant="outline"
-                      className="border-teal-200 hover:bg-teal-50"
-                    >
-                      <Home className="h-4 w-4 mr-2" />
-                      Menu
-                    </Button>
-                  </div>
-                </div>
+                {isAnalyzing ? (
+                  <AnalyzingLoader />
+                ) : traits ? (
+                  <TraitsDisplay
+                    traits={traits}
+                    gameName="maze-escape"
+                    onPlayAgain={resetGame}
+                    onBackToMenu={onBackToGames}
+                  />
+                ) : (
+                  <motion.div
+                    className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        {gameState.hasWon ? (
+                          <Trophy className="h-8 w-8 text-white" />
+                        ) : (
+                          <Timer className="h-8 w-8 text-white" />
+                        )}
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        {gameState.hasWon ? "🎉 You Escaped!" : "⏰ Time's Up!"}
+                      </h2>
+                      <div className="text-gray-600 dark:text-gray-400 mb-4 space-y-1">
+                        <p>Moves: {gameState.moves}</p>
+                        <p>Time: {formatTime(currentDifficulty.timeLimit - gameState.timer)}</p>
+                        {gameState.hasWon && (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Maze Completed!
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-3 justify-center">
+                        <Button onClick={resetGame} variant="outline" className="border-teal-200 hover:bg-teal-50">
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Play Again
+                        </Button>
+                        <Button onClick={onBackToGames} variant="outline" className="border-teal-200 hover:bg-teal-50">
+                          <Home className="h-4 w-4 mr-2" />
+                          Menu
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             </motion.div>
           )}
