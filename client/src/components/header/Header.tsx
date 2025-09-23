@@ -1,12 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Menu, X, User, LogOut, Settings } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import useAuthStore from "@/store/store"
-import ThemeToggle from "./ThemeToggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,9 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
 import { Axios } from "@/config/axios"
 import { env } from "@/config/env"
+import useAuthStore from "@/store/store"
+import { LogOut, Menu, Settings, User, X } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import ThemeToggle from "./ThemeToggle"
 
 function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -110,9 +110,9 @@ function Header() {
             <a href="#testimonials" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Testimonials
             </a>
-            <a href="#pricing" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Pricing
-            </a>
+            <Link href="/games" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              Games
+            </Link>
           </nav>
           {/* Right Side: Avatar Dropdown (if logged in) or Login Button & Theme Toggle */}
           <div className="flex items-center space-x-1 sm:space-x-3 md:space-x-4">
@@ -291,4 +291,3 @@ function Header() {
 }
 
 export default Header
-
