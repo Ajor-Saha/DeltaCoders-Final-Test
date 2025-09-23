@@ -47,6 +47,7 @@ export const submitQuiz = asyncHandler(async (req: Request, res: Response) => {
             question: question.question,
             userChoice: userChoice as string,
             correctAnswer: question.correctAnswer,
+            difficulty: question.difficulty,
           });
         }
 
@@ -130,6 +131,7 @@ export const submitQuiz = asyncHandler(async (req: Request, res: Response) => {
             question: w.question,
             yourAnswer: w.userChoice,
             correctAnswer: w.correctAnswer,
+            difficulty: w.difficulty,
           })),
         },
         'Quiz submitted successfully'

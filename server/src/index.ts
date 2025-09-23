@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import logger from 'morgan';
 import user_router from './routes/auth-route';
+import cognitive_assessment_router from './routes/cognitive-assessment-route';
 import question_router from './routes/question-route';
 import resource_router from './routes/resource-route';
 import subject_router from './routes/subject-route';
@@ -32,9 +33,15 @@ app.use('/api/subject', subject_router);
 // Mount topic router
 app.use('/api/topic', topic_router);
 // Mount question router
+<<<<<<< Updated upstream
 app.use('/api', question_router);
 /// Mount resource route
 app.use('/api/resource', resource_router);
+=======
+app.use('/api/question', question_router);
+// Mount cognitive assessment router
+app.use('/api/cognitive-assessment', cognitive_assessment_router);
+>>>>>>> Stashed changes
 
 app.get('/', (req, res) => {
   res.send('Company & task server is running');
