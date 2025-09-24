@@ -533,17 +533,70 @@ export const generateQuiz = asyncHandler(
       // If new quiz, create quiz entry first
       if (isNewQuiz) {
         const newQuizId = uuidv4();
+        let resolvedSubjectId = subjectId;
+
+        // If topic-based, find the subjectId from the topic
+        if (isTopicBased && topicId) {
+          const topicData = await db
+            .select({ subjectId: topicsTable.subjectId })
+            .from(topicsTable)
+            .where(eq(topicsTable.topicId, topicId))
+            .limit(1);
+
+          if (topicData.length === 0) {
+            return res
+              .status(404)
+              .json(new ApiResponse(404, {}, 'Topic not found'));
+          }
+
+          resolvedSubjectId = topicData[0].subjectId;
+          console.log(
+            `Found subjectId ${resolvedSubjectId} for topicId ${topicId}`
+          );
+        }
+
         const quizData = {
           quizId: newQuizId,
           userId,
           topicId: isTopicBased ? topicId : null,
-          subjectId: isTopicBased ? null : subjectId,
+          subjectId: resolvedSubjectId,
           attemptCount: 0,
         };
 
         await db.insert(quizzesTable).values(quizData);
         finalQuizId = newQuizId;
-        console.log(`New quiz created with ID: ${finalQuizId}`);
+        console.log(
+          `New quiz created with ID: ${finalQuizId}, subjectId: ${resolvedSubjectId}`
+        );
+      } else {
+        // For existing quiz, ensure it has subjectId if it's topic-based and subjectId is missing
+        if (isTopicBased && topicId) {
+          const existingQuiz = await db
+            .select({ subjectId: quizzesTable.subjectId })
+            .from(quizzesTable)
+            .where(eq(quizzesTable.quizId, quizId))
+            .limit(1);
+
+          if (existingQuiz.length > 0 && !existingQuiz[0].subjectId) {
+            const topicData = await db
+              .select({ subjectId: topicsTable.subjectId })
+              .from(topicsTable)
+              .where(eq(topicsTable.topicId, topicId))
+              .limit(1);
+
+            if (topicData.length > 0) {
+              await db
+                .update(quizzesTable)
+                .set({ subjectId: topicData[0].subjectId })
+                .where(eq(quizzesTable.quizId, quizId));
+
+              console.log(
+                `Updated existing quiz ${quizId} with subjectId: ${topicData[0].subjectId}`
+              );
+            }
+          }
+        }
+        finalQuizId = quizId;
       }
 
       // Get content based on topic or subject
@@ -1035,13 +1088,35 @@ export const createQuiz = asyncHandler(async (req: Request, res: Response) => {
         );
     }
 
+    let resolvedSubjectId = subjectId;
+
+    // If topicId is provided, find the subjectId from the topic
+    if (topicId && !subjectId) {
+      const topicData = await db
+        .select({ subjectId: topicsTable.subjectId })
+        .from(topicsTable)
+        .where(eq(topicsTable.topicId, topicId))
+        .limit(1);
+
+      if (topicData.length === 0) {
+        return res
+          .status(404)
+          .json(new ApiResponse(404, {}, 'Topic not found'));
+      }
+
+      resolvedSubjectId = topicData[0].subjectId;
+      console.log(
+        `Found subjectId ${resolvedSubjectId} for topicId ${topicId}`
+      );
+    }
+
     // Create quiz record in database
     const quizId = uuidv4();
     const quizData = {
       quizId,
       userId,
       topicId: topicId || null,
-      subjectId: subjectId || null,
+      subjectId: resolvedSubjectId,
       attemptCount: 0,
     };
 
