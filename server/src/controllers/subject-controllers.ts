@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
@@ -540,6 +540,75 @@ export const fixMissingQuizSubjectIds = asyncHandler(
       );
     } catch (error) {
       console.error('Error fixing missing quiz subjectIds:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+// Get per-subject progress for the authenticated user
+export const getSubjectProgress = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const authUser = req.user;
+      if (!authUser) {
+        return res
+          .status(401)
+          .json(new ApiResponse(401, {}, 'Not authenticated'));
+      }
+
+      const { subjectId } = req.params;
+      if (!subjectId || subjectId.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Subject ID is required'));
+      }
+
+      // Fetch all topics under this subject
+      const subjectTopics = await db
+        .select({ topicId: topicsTable.topicId })
+        .from(topicsTable)
+        .where(eq(topicsTable.subjectId, subjectId));
+
+      const totalTopics = subjectTopics.length;
+
+      // Find distinct topicIds where the user has attempted (attemptCount > 0) a quiz for this subject
+      // Note: This relies on quizzes.subjectId being set. Use fixMissingQuizSubjectIds to backfill if needed.
+      const attemptedRows = await db
+        .select({ topicId: quizzesTable.topicId })
+        .from(quizzesTable)
+        .where(
+          and(
+            eq(quizzesTable.userId, authUser.userId),
+            eq(quizzesTable.subjectId, subjectId),
+            // drizzle-orm doesn't have a universal gt import in older versions; use raw SQL for safety
+            // attempt_count > 0
+            // @ts-ignore - sql boolean expression
+            sql`${quizzesTable.attemptCount} > 0`,
+            // Ensure topicId is not null
+            // @ts-ignore - sql boolean expression
+            sql`${quizzesTable.topicId} IS NOT NULL`
+          )
+        )
+        .groupBy(quizzesTable.topicId);
+
+      const completedTopicIds = Array.from(
+        new Set((attemptedRows || []).map(r => r.topicId).filter(Boolean))
+      ) as string[];
+
+      const response = {
+        subject_id: subjectId,
+        total_topics: totalTopics,
+        total_completed_topics: completedTopicIds.length,
+        completed_topics: completedTopicIds,
+      };
+
+      return res
+        .status(200)
+        .json(new ApiResponse(200, response, 'Subject progress retrieved'));
+    } catch (error) {
+      console.error('Error getting subject progress:', error);
       return res
         .status(500)
         .json(new ApiResponse(500, null, 'Internal server error'));
