@@ -1,92 +1,9 @@
 {
-  "id": "c267ba22-db14-4549-ba64-18720ab54a6e",
+  "id": "8671c86c-0f85-4f14-a4c9-53adb80698a9",
   "prevId": "d18f3355-783d-4e36-bdf9-e39d288c4a57",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.cognitive_assessments": {
-      "name": "cognitive_assessments",
-      "schema": "",
-      "columns": {
-        "assessment_id": {
-          "name": "assessment_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quiz_id": {
-          "name": "quiz_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "weighted_score": {
-          "name": "weighted_score",
-          "type": "numeric(5, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "stress_score": {
-          "name": "stress_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "attention_score": {
-          "name": "attention_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cognitive_score": {
-          "name": "cognitive_score",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "current_timestamp"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "cognitive_assessments_quiz_id_quizzes_quiz_id_fk": {
-          "name": "cognitive_assessments_quiz_id_quizzes_quiz_id_fk",
-          "tableFrom": "cognitive_assessments",
-          "tableTo": "quizzes",
-          "columnsFrom": [
-            "quiz_id"
-          ],
-          "columnsTo": [
-            "quiz_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.external_resources": {
       "name": "external_resources",
       "schema": "",
@@ -166,12 +83,8 @@
           "name": "external_resources_subject_id_subjects_subject_id_fk",
           "tableFrom": "external_resources",
           "tableTo": "subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "subject_id"
-          ],
+          "columnsFrom": ["subject_id"],
+          "columnsTo": ["subject_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -225,12 +138,8 @@
           "name": "lessons_topic_id_topics_topic_id_fk",
           "tableFrom": "lessons",
           "tableTo": "topics",
-          "columnsFrom": [
-            "topic_id"
-          ],
-          "columnsTo": [
-            "topic_id"
-          ],
+          "columnsFrom": ["topic_id"],
+          "columnsTo": ["topic_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -326,12 +235,8 @@
           "name": "quiz_questions_quiz_id_quizzes_quiz_id_fk",
           "tableFrom": "quiz_questions",
           "tableTo": "quizzes",
-          "columnsFrom": [
-            "quiz_id"
-          ],
-          "columnsTo": [
-            "quiz_id"
-          ],
+          "columnsFrom": ["quiz_id"],
+          "columnsTo": ["quiz_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -410,12 +315,8 @@
           "name": "quiz_results_quiz_id_quizzes_quiz_id_fk",
           "tableFrom": "quiz_results",
           "tableTo": "quizzes",
-          "columnsFrom": [
-            "quiz_id"
-          ],
-          "columnsTo": [
-            "quiz_id"
-          ],
+          "columnsFrom": ["quiz_id"],
+          "columnsTo": ["quiz_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -482,12 +383,8 @@
           "name": "quizzes_user_id_tbl_user_user_id_fk",
           "tableFrom": "quizzes",
           "tableTo": "tbl_user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["user_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -495,12 +392,8 @@
           "name": "quizzes_topic_id_topics_topic_id_fk",
           "tableFrom": "quizzes",
           "tableTo": "topics",
-          "columnsFrom": [
-            "topic_id"
-          ],
-          "columnsTo": [
-            "topic_id"
-          ],
+          "columnsFrom": ["topic_id"],
+          "columnsTo": ["topic_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -508,12 +401,8 @@
           "name": "quizzes_subject_id_subjects_subject_id_fk",
           "tableFrom": "quizzes",
           "tableTo": "subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "subject_id"
-          ],
+          "columnsFrom": ["subject_id"],
+          "columnsTo": ["subject_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -599,12 +488,8 @@
           "name": "short_question_exams_user_id_tbl_user_user_id_fk",
           "tableFrom": "short_question_exams",
           "tableTo": "tbl_user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["user_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -612,12 +497,8 @@
           "name": "short_question_exams_subject_id_subjects_subject_id_fk",
           "tableFrom": "short_question_exams",
           "tableTo": "subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "subject_id"
-          ],
+          "columnsFrom": ["subject_id"],
+          "columnsTo": ["subject_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -709,12 +590,8 @@
           "name": "short_questions_exam_id_short_question_exams_exam_id_fk",
           "tableFrom": "short_questions",
           "tableTo": "short_question_exams",
-          "columnsFrom": [
-            "exam_id"
-          ],
-          "columnsTo": [
-            "exam_id"
-          ],
+          "columnsFrom": ["exam_id"],
+          "columnsTo": ["exam_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -821,12 +698,8 @@
           "name": "topics_subject_id_subjects_subject_id_fk",
           "tableFrom": "topics",
           "tableTo": "subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "subject_id"
-          ],
+          "columnsFrom": ["subject_id"],
+          "columnsTo": ["subject_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -918,11 +791,141 @@
         "tbl_user_email_unique": {
           "name": "tbl_user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_chat_messages": {
+      "name": "user_chat_messages",
+      "schema": "",
+      "columns": {
+        "message_id": {
+          "name": "message_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chat_id": {
+          "name": "chat_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_message": {
+          "name": "user_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ai_response": {
+          "name": "ai_response",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "current_timestamp"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_chat_messages_chat_id_user_chats_chat_id_fk": {
+          "name": "user_chat_messages_chat_id_user_chats_chat_id_fk",
+          "tableFrom": "user_chat_messages",
+          "tableTo": "user_chats",
+          "columnsFrom": ["chat_id"],
+          "columnsTo": ["chat_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_chat_messages_user_id_tbl_user_user_id_fk": {
+          "name": "user_chat_messages_user_id_tbl_user_user_id_fk",
+          "tableFrom": "user_chat_messages",
+          "tableTo": "tbl_user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["user_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_chats": {
+      "name": "user_chats",
+      "schema": "",
+      "columns": {
+        "chat_id": {
+          "name": "chat_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "current_timestamp"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_chats_user_id_tbl_user_user_id_fk": {
+          "name": "user_chats_user_id_tbl_user_user_id_fk",
+          "tableFrom": "user_chats",
+          "tableTo": "tbl_user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["user_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -978,12 +981,8 @@
           "name": "user_subjects_user_id_tbl_user_user_id_fk",
           "tableFrom": "user_subjects",
           "tableTo": "tbl_user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["user_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -991,12 +990,8 @@
           "name": "user_subjects_subject_id_subjects_subject_id_fk",
           "tableFrom": "user_subjects",
           "tableTo": "subjects",
-          "columnsFrom": [
-            "subject_id"
-          ],
-          "columnsTo": [
-            "subject_id"
-          ],
+          "columnsFrom": ["subject_id"],
+          "columnsTo": ["subject_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1012,20 +1007,12 @@
     "public.topic_difficulty": {
       "name": "topic_difficulty",
       "schema": "public",
-      "values": [
-        "Easy",
-        "Medium",
-        "Hard"
-      ]
+      "values": ["Easy", "Medium", "Hard"]
     },
     "public.user_level": {
       "name": "user_level",
       "schema": "public",
-      "values": [
-        "beginner",
-        "intermediate",
-        "advanced"
-      ]
+      "values": ["beginner", "intermediate", "advanced"]
     }
   },
   "schemas": {},
