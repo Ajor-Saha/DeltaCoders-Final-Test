@@ -188,7 +188,7 @@ export const generateWeakLessons = asyncHandler(
         `Found ${topics.length} topics for subject: ${subject.subjectName}`
       );
 
-      // Get all quiz attempts with detailed question analysis
+      // Get only attempted quizzes (those with quiz results) for analysis
       const userQuizData = await db
         .select({
           quizId: quizzesTable.quizId,
@@ -202,7 +202,7 @@ export const generateWeakLessons = asyncHandler(
         })
         .from(quizzesTable)
         .innerJoin(topicsTable, eq(quizzesTable.topicId, topicsTable.topicId))
-        .leftJoin(
+        .innerJoin(
           quizResultsTable,
           eq(quizzesTable.quizId, quizResultsTable.quizId)
         )
@@ -278,10 +278,14 @@ export const generateWeakLessons = asyncHandler(
       const quizAnalysisData: QuizAnalysisData[] = [];
 
       for (const quiz of userQuizData) {
-        if (!quiz.quizId) continue; // Skip if no quiz result exists
+        // Skip quizzes that don't have valid results or scores
+        if (!quiz.quizId || quiz.score === null || quiz.score === undefined) {
+          console.log(`Skipping quiz ${quiz.quizId} - no valid score found`);
+          continue;
+        }
 
         console.log(
-          `Analyzing quiz ${quiz.quizId} for topic: ${quiz.topicTitle}`
+          `Analyzing attempted quiz ${quiz.quizId} for topic: ${quiz.topicTitle} (Score: ${quiz.score}%)`
         );
 
         // Get all questions for this quiz with user answers
@@ -309,13 +313,14 @@ export const generateWeakLessons = asyncHandler(
 
         const correctAnswers = questionAnalysis.filter(q => q.isCorrect).length;
         const totalQuestions = questionAnalysis.length;
-        const percentage =
-          totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+
+        // The score field is already stored as a percentage in the database
+        const percentage = quiz.score || 0;
 
         console.log(
-          `Quiz performance: ${correctAnswers}/${totalQuestions} = ${percentage.toFixed(
+          `Quiz performance: ${percentage.toFixed(
             1
-          )}%`
+          )}% score (${correctAnswers}/${totalQuestions} questions correct)`
         );
 
         quizAnalysisData.push({
@@ -361,6 +366,8 @@ export const generateWeakLessons = asyncHandler(
       // Generate LLM prompt with quiz analysis data
       const prompt = `You are an expert educational analyst. Analyze the student's quiz performance data and identify weak areas that need remedial study.
 
+CRITICAL INSTRUCTION: Performance percentages are already calculated scores from the quiz system (0-100%). Do not recalculate or misinterpret these values.
+
 SUBJECT: ${subject.subjectName}
 TOTAL TOPICS AVAILABLE: ${topics.length}
 TOPICS ATTEMPTED: ${quizAnalysisData.length}
@@ -372,9 +379,8 @@ ${quizAnalysisData
 === Quiz ${index + 1}: ${quiz.topicTitle} ===
 Topic Description: ${quiz.topicDescription || 'No description available'}
 Topic Difficulty: ${quiz.topicDifficulty}
-Overall Performance: ${quiz.correctAnswers}/${quiz.totalQuestions} = ${
-      quiz.percentage
-    }%
+Performance Score: ${quiz.percentage}%
+Questions Attempted: ${quiz.totalQuestions} questions
 Completed: ${
       quiz.completedAt
         ? new Date(quiz.completedAt).toLocaleDateString()
@@ -417,19 +423,21 @@ ${topics
   .join('')}
 
 ANALYSIS INSTRUCTIONS:
-1. Identify topics where the student performed poorly (< 60% correct)
-2. Look for patterns in wrong answers to identify conceptual gaps
-3. Consider question difficulty levels when assessing performance
-4. For each weak area identified, provide specific remedial recommendations
-5. If performance is good across all topics (≥75% average), indicate no major weaknesses found
+1. Performance scores are ALREADY CALCULATED as percentages (0-100%) - do not recalculate them
+2. Identify topics where the student performed poorly (< 60% score)
+3. Look for patterns in wrong answers to identify conceptual gaps
+4. Consider question difficulty levels when assessing performance
+5. For each weak area identified, provide specific remedial recommendations
+6. If performance is good across all topics (≥75% average), indicate no major weaknesses found
+7. Use only the provided percentage scores - do not create fractions or impossible scores
 
 REQUIRED OUTPUT FORMAT:
 {
   "analysis": {
     "totalTopics": ${topics.length},
     "attemptedTopics": ${quizAnalysisData.length},
-    "averageOverallPerformance": [calculate average percentage across all quizzes],
-    "performanceSummary": "[brief summary of student's performance]"
+    "averageOverallPerformance": [use the provided percentage scores to calculate average],
+    "performanceSummary": "[brief summary of student's performance based on percentage scores]"
   },
   "weakTopics": [
     {
@@ -437,7 +445,7 @@ REQUIRED OUTPUT FORMAT:
       "title": "Topic Name",
       "description": "Topic description",
       "difficulty": "Easy/Medium/Hard",
-      "averagePerformance": [percentage score],
+      "averagePerformance": [use the provided percentage score as-is],
       "problemAreas": "[specific areas where student struggled]",
       "remedialRecommendations": "[specific study recommendations]"
     }
@@ -446,8 +454,8 @@ REQUIRED OUTPUT FORMAT:
     {
       "topicId": "topic_id",
       "title": "Topic Name",
-      "performance": [percentage],
-      "isWeak": [true/false]
+      "performance": [use the provided percentage as-is],
+      "isWeak": [true if < 60%, false if >= 60%]
     }
   ],
   "unattemptedTopics": [
