@@ -77,6 +77,12 @@ interface QuizState {
     yourAnswer: string;
     correctAnswer: string;
   }>;
+  mentalScores?: {
+    weighted_score: number;
+    attention_score: number;
+    stress_score: number;
+    cognitive_load_score: number;
+  } | null;
   // New states for quiz management
   showQuizList: boolean;
   existingQuizzes: any[];
@@ -269,15 +275,76 @@ export function QuizMaker({
       if (response.data.success) {
         const { score, feedback, weaknesses } = response.data.data;
 
+        // Compute detailed correctness for mental status payload
+        const questionsPayload = quizData.questions.map((q, index) => ({
+          id: q.id,
+          difficulty: q.difficulty,
+          correct: quizState.selectedAnswers[index] === q.correctAnswer,
+        }));
+
+        // Compute totals based on selections
+        const totalCorrect = questionsPayload.filter(q => q.correct).length;
+        const totalQuestions = quizData.questions.length;
+
+        // Derive weakness topics: use incorrect question texts
+        const weaknessTopics: string[] = quizData.questions
+          .map((q, index) => ({ q, correct: quizState.selectedAnswers[index] === q.correctAnswer }))
+          .filter(item => !item.correct)
+          .map(item => item.q.question);
+        // Prepare mental status payload
+        const mentalPayload = {
+          quiz_id: quizData.quiz.id,
+          quiz_data:{
+            questions: questionsPayload,
+            feedback: feedback || '',
+            total_score: totalCorrect,
+            total_questions: totalQuestions,
+            weakness_topics: weaknessTopics,
+          }
+        };
+
+        // Call backend to analyze mental status BEFORE setting final result state
+        // Assumption: endpoint '/api/topic/quiz-mental-status' accepts above payload and returns parsed scores object
+        let mentalScores: QuizState['mentalScores'] = null;
+        try {
+          const msRes = await Axios.post('/api/topic/quiz-mental-status', mentalPayload, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          let data = msRes?.data?.data ?? msRes?.data;
+          console.log("msres", msRes.data);
+          console.log("Mental status raw response:", data);
+          // Normalize and set scores
+          const tryParse = (x: any) => {
+            try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return x; }
+          };
+          let core = tryParse(data);
+          if (core?.data) core = tryParse(core.data);
+          if (core?.result?.Output) core = tryParse(core.result.Output);
+          const scores = core?.scores || core?.metrics || core;
+          if (scores && typeof scores === 'object') {
+            mentalScores = {
+              weighted_score: Number(scores.weighted_score ?? scores.weightedScore ?? 0),
+              attention_score: Number(scores.attention_score ?? scores.attentionScore ?? 0),
+              stress_score: Number(scores.stress_score ?? scores.stressScore ?? 0),
+              cognitive_load_score: Number(scores.cognitive_load_score ?? scores.cognitiveLoadScore ?? 0),
+            };
+          }
+
+        } catch (e) {
+          console.error('Mental status analysis failed:', e);
+        }
+
         // Store weakness summary for future quiz generation
         const weaknessSummary = weaknesses?.map((w: any) => w.question).join(', ') || '';
 
+        console.log("mentalScores:", mentalScores);
         setQuizState(prev => ({
           ...prev,
           showResults: true,
           score,
           feedback,
           weaknesses,
+          mentalScores,
           lastWeakness: weaknessSummary,
           isSubmitting: false,
         }));
@@ -459,6 +526,29 @@ export function QuizMaker({
               Here are your results for {quizData.quiz.topic?.title || quizData.quiz.subject.name}
             </p>
           </CardHeader>
+          {quizState.mentalScores && (
+            <CardContent className="pt-0">
+              <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Mental Status</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Weighted Score</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.weighted_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Attention</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.attention_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Stress</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.stress_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Cognitive Load</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.cognitive_load_score}</div>
+                </div>
+              </div>
+            </CardContent>
+          )}
           {quizState.feedback && (
             <CardContent className="border-t border-gray-200 dark:border-gray-800 mt-4 pt-4">
               <div className="prose dark:prose-invert max-w-none">

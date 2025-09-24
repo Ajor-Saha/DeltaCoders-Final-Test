@@ -6,6 +6,7 @@ import logger from 'morgan';
 import aibot_router from './routes/aibot-route';
 import user_router from './routes/auth-route';
 import cognitive_assessment_router from './routes/cognitive-assessment-route';
+import gameAnalyticsRouter from './routes/game-analytics-route';
 import question_router from './routes/question-route';
 import resource_router from './routes/resource-route';
 import subject_router from './routes/subject-route';
@@ -41,6 +42,8 @@ app.use('/api/resource', resource_router);
 app.use('/api/aibot', aibot_router);
 // Mount cognitive assessment router
 app.use('/api/cognitive-assessment', cognitive_assessment_router);
+// Mount game analytics router
+app.use('/api/games', gameAnalyticsRouter);
 
 app.get('/', (req, res) => {
   res.send('Company & task server is running');

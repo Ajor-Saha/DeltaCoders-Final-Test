@@ -3,18 +3,21 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGameAnalytics } from "@/hooks/useGameAnalytics";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Home,
-  Palette,
-  Play,
-  RotateCcw,
-  Star,
-  Target,
-  Timer,
-  Trophy
+    Home,
+    Palette,
+    Play,
+    RotateCcw,
+    Star,
+    Target,
+    Timer,
+    Trophy
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { AnalyzingLoader } from "./AnalyzingLoader";
+import { TraitsDisplay } from "./TraitsDisplay";
 
 interface Shape {
   id: number;
@@ -97,6 +100,7 @@ interface ColorMatchGameProps {
 }
 
 export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
+  const { startSession, trackAction, trackError, endSession, traits, isAnalyzing, sessionActive } = useGameAnalytics('color-match');
   const [gameState, setGameState] = useState<GameState>({
     shapes: [],
     timer: 90,
@@ -111,6 +115,7 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
   const currentLevel = levels[gameState.level - 1];
 
   const initGame = useCallback(() => {
+    startSession();
     const shapes: Shape[] = [];
     const levelData = levels[gameState.level - 1];
 
@@ -148,6 +153,7 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
 
   const handleShapeClick = (shape: Shape) => {
     if (shape.matched || !gameState.isPlaying) return;
+    trackAction();
 
     setGameState(prev => {
       const newState = { ...prev };
@@ -175,6 +181,7 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
         }
       } else {
         // No match - deselect after brief delay
+        trackError();
         newState.selectedShape = null;
         setTimeout(() => {
           setGameState(current => ({ ...current, selectedShape: null }));
@@ -207,6 +214,13 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
       return cleanup;
     }
   }, [gameState.isPlaying, startTimer]);
+
+  // End analytics session when game over
+  useEffect(() => {
+    if (gameState.isGameOver && sessionActive) {
+      endSession(gameState.score);
+    }
+  }, [gameState.isGameOver, gameState.score, sessionActive, endSession]);
 
   const resetGame = () => {
     setGameState(prev => ({
@@ -458,7 +472,7 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
           </motion.div>
         )}
 
-        {/* Game Over Modal */}
+        {/* Game Over Modal with Analytics */}
         <AnimatePresence>
           {gameState.isGameOver && (
             <motion.div
@@ -468,63 +482,65 @@ export default function ColorMatchGame({ onBackToGames }: ColorMatchGameProps) {
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full mx-4"
+                className="max-w-md w-full mx-4"
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
               >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    {isLevelComplete ? (
-                      <Trophy className="h-8 w-8 text-white" />
-                    ) : (
-                      <Timer className="h-8 w-8 text-white" />
-                    )}
-                  </div>
-
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {isLevelComplete ? "Level Complete!" : "Time's Up!"}
-                  </h2>
-
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Final Score: {gameState.score} / {gameState.targetScore}
-                  </p>
-
-                  {isLevelComplete && (
-                    <Badge className="mb-4 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Target Achieved!
-                    </Badge>
-                  )}
-
-                  <div className="flex gap-3 justify-center">
-                    <Button
-                      onClick={resetGame}
-                      variant="outline"
-                      className="border-teal-200 hover:bg-teal-50"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Play Again
-                    </Button>
-
-                    {canAdvance && (
-                      <Button
-                        onClick={nextLevel}
-                        className="bg-gradient-to-r from-teal-400 to-teal-600 hover:from-teal-500 hover:to-teal-700 text-white"
-                      >
-                        Next Level
-                      </Button>
-                    )}
-
-                    <Button
-                      onClick={onBackToGames}
-                      variant="outline"
-                      className="border-teal-200 hover:bg-teal-50"
-                    >
-                      <Home className="h-4 w-4 mr-2" />
-                      Menu
-                    </Button>
-                  </div>
-                </div>
+                {isAnalyzing ? (
+                  <AnalyzingLoader />
+                ) : traits ? (
+                  <TraitsDisplay
+                    traits={traits}
+                    gameName="color-match"
+                    score={gameState.score}
+                    onPlayAgain={resetGame}
+                    onBackToMenu={onBackToGames}
+                  />
+                ) : (
+                  <motion.div
+                    className="bg-white dark:bg-gray-800 rounded-2xl p-8 w-full"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        {isLevelComplete ? (
+                          <Trophy className="h-8 w-8 text-white" />
+                        ) : (
+                          <Timer className="h-8 w-8 text-white" />
+                        )}
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        {isLevelComplete ? "Level Complete!" : "Time's Up!"}
+                      </h2>
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        Final Score: {gameState.score} / {gameState.targetScore}
+                      </p>
+                      {isLevelComplete && (
+                        <Badge className="mb-4 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          Target Achieved!
+                        </Badge>
+                      )}
+                      <div className="flex gap-3 justify-center">
+                        <Button onClick={resetGame} variant="outline" className="border-teal-200 hover:bg-teal-50">
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Play Again
+                        </Button>
+                        {canAdvance && (
+                          <Button onClick={nextLevel} className="bg-gradient-to-r from-teal-400 to-teal-600 hover:from-teal-500 hover:to-teal-700 text-white">
+                            Next Level
+                          </Button>
+                        )}
+                        <Button onClick={onBackToGames} variant="outline" className="border-teal-200 hover:bg-teal-50">
+                          <Home className="h-4 w-4 mr-2" />
+                          Menu
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             </motion.div>
           )}
