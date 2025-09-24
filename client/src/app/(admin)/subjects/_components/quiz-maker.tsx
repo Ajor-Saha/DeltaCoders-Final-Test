@@ -291,15 +291,16 @@ export function QuizMaker({
           .map((q, index) => ({ q, correct: quizState.selectedAnswers[index] === q.correctAnswer }))
           .filter(item => !item.correct)
           .map(item => item.q.question);
-        const user_id = useAuthStore.getState().user?.userId || 'unknown_user';
         // Prepare mental status payload
         const mentalPayload = {
           quiz_id: quizData.quiz.id,
-          questions: questionsPayload,
-          feedback: feedback || '',
-          total_score: totalCorrect,
-          total_questions: totalQuestions,
-          weakness_topics: weaknessTopics,
+          quiz_data:{
+            questions: questionsPayload,
+            feedback: feedback || '',
+            total_score: totalCorrect,
+            total_questions: totalQuestions,
+            weakness_topics: weaknessTopics,
+          }
         };
 
         // Call backend to analyze mental status BEFORE setting final result state
@@ -310,16 +311,25 @@ export function QuizMaker({
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           let data = msRes?.data?.data ?? msRes?.data;
-          console.log("msres", msRes);
+          console.log("msres", msRes.data);
           console.log("Mental status raw response:", data);
-          // Backend may return stringified JSON or nested Output
-          if (typeof data === 'string') {
-            mentalScores = JSON.parse(data);
-          } else if (data?.result?.Output) {
-            mentalScores = JSON.parse(data.result.Output);
-          } else if (data && typeof data === 'object') {
-            mentalScores = data as QuizState['mentalScores'];
+          // Normalize and set scores
+          const tryParse = (x: any) => {
+            try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return x; }
+          };
+          let core = tryParse(data);
+          if (core?.data) core = tryParse(core.data);
+          if (core?.result?.Output) core = tryParse(core.result.Output);
+          const scores = core?.scores || core?.metrics || core;
+          if (scores && typeof scores === 'object') {
+            mentalScores = {
+              weighted_score: Number(scores.weighted_score ?? scores.weightedScore ?? 0),
+              attention_score: Number(scores.attention_score ?? scores.attentionScore ?? 0),
+              stress_score: Number(scores.stress_score ?? scores.stressScore ?? 0),
+              cognitive_load_score: Number(scores.cognitive_load_score ?? scores.cognitiveLoadScore ?? 0),
+            };
           }
+
         } catch (e) {
           console.error('Mental status analysis failed:', e);
         }
@@ -517,22 +527,25 @@ export function QuizMaker({
             </p>
           </CardHeader>
           {quizState.mentalScores && (
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-0">
-              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Weighted Score</div>
-                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.weighted_score}</div>
-              </div>
-              <div className="text-center p-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Attention</div>
-                <div className="text-2xl font-bold text-teal-700 dark:text-teal-300">{quizState.mentalScores.attention_score}</div>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Stress</div>
-                <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{quizState.mentalScores.stress_score}</div>
-              </div>
-              <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Cognitive Load</div>
-                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{quizState.mentalScores.cognitive_load_score}</div>
+            <CardContent className="pt-0">
+              <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Mental Status</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Weighted Score</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.weighted_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Attention</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.attention_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Stress</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.stress_score}</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20">
+                  <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Cognitive Load</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{quizState.mentalScores.cognitive_load_score}</div>
+                </div>
               </div>
             </CardContent>
           )}
