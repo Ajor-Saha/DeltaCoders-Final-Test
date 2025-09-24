@@ -11,6 +11,7 @@ import question_router from './routes/question-route';
 import resource_router from './routes/resource-route';
 import subject_router from './routes/subject-route';
 import topic_router from './routes/topic-route';
+import weakLessons_router from './routes/weaklessons-route';
 
 dotenv.config();
 
@@ -44,6 +45,8 @@ app.use('/api/aibot', aibot_router);
 app.use('/api/cognitive-assessment', cognitive_assessment_router);
 // Mount game analytics router
 app.use('/api/games', gameAnalyticsRouter);
+// Mount weak lessons router
+app.use('/api/weak-lessons', weakLessons_router);
 
 app.get('/', (req, res) => {
   res.send('Company & task server is running');
