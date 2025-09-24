@@ -28,7 +28,7 @@ topic_router.route('/generate-short-questions').post(generateShortQuestions);
 
 topic_router.route('/create-quiz').post(createQuiz);
 topic_router.route('/submit-quiz').post(submitQuiz);
-topic_router.route('/quiz-mental-status').post(analyzeQuizMentalStatus);
+topic_router.route('/cognitive-assessment').post(analyzeQuizMentalStatus);
 topic_router.route('/quizzes/:topicId').get(getQuizzesByTopic);
 topic_router.route('/quiz/:quizId').get(getQuizById);
 
