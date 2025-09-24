@@ -303,16 +303,16 @@ export function QuizMaker({
           }
         };
 
-        // Call backend to analyze mental status BEFORE setting final result state
-        // Assumption: endpoint '/api/topic/quiz-mental-status' accepts above payload and returns parsed scores object
+        // Call backend to analyze cognitive assessment BEFORE setting final result state
+        // Assumption: endpoint '/api/topic/cognitive-assessment' accepts above payload and returns parsed scores object
         let mentalScores: QuizState['mentalScores'] = null;
         try {
-          const msRes = await Axios.post('/api/topic/quiz-mental-status', mentalPayload, {
+          const msRes = await Axios.post('/api/topic/cognitive-assessment', mentalPayload, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           let data = msRes?.data?.data ?? msRes?.data;
           console.log("msres", msRes.data);
-          console.log("Mental status raw response:", data);
+          console.log("Cognitive assessment raw response:", data);
           // Normalize and set scores
           const tryParse = (x: any) => {
             try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return x; }

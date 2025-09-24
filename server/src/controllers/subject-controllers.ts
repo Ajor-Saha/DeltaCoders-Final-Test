@@ -1,7 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
+import { quizzesTable } from '../db/schema/tbl-quizzes';
 import { subjectsTable } from '../db/schema/tbl-subjects';
 import { topicsTable } from '../db/schema/tbl-topics';
 import { userSubjectsTable } from '../db/schema/tbl-user-subjects';
@@ -400,10 +401,13 @@ export const getSubjectById = asyncHandler(
             title: topicsTable.title,
             description: topicsTable.description,
             difficulty: topicsTable.difficulty,
-          }
+          },
         })
         .from(subjectsTable)
-        .leftJoin(topicsTable, eq(subjectsTable.subjectId, topicsTable.subjectId))
+        .leftJoin(
+          topicsTable,
+          eq(subjectsTable.subjectId, topicsTable.subjectId)
+        )
         .where(eq(subjectsTable.subjectId, subjectId));
 
       if (subjectWithTopics.length === 0) {
@@ -420,7 +424,7 @@ export const getSubjectById = asyncHandler(
         updatedAt: subjectWithTopics[0].updatedAt,
         topics: subjectWithTopics
           .filter(row => row.topics && row.topics.topicId)
-          .map(row => row.topics)
+          .map(row => row.topics),
       };
 
       return res
@@ -434,6 +438,108 @@ export const getSubjectById = asyncHandler(
         );
     } catch (error) {
       console.error('Error retrieving subject:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+export const fixMissingQuizSubjectIds = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      console.log('Starting to fix missing subjectId in quizzes...');
+
+      // Find all quizzes where subjectId is null but topicId exists
+      const quizzesWithMissingSubjectId = await db
+        .select({
+          quizId: quizzesTable.quizId,
+          topicId: quizzesTable.topicId,
+          userId: quizzesTable.userId,
+        })
+        .from(quizzesTable)
+        .where(
+          and(
+            isNull(quizzesTable.subjectId),
+            eq(quizzesTable.topicId, quizzesTable.topicId) // Ensure topicId exists
+          )
+        );
+
+      console.log(
+        `Found ${quizzesWithMissingSubjectId.length} quizzes with missing subjectId`
+      );
+
+      if (quizzesWithMissingSubjectId.length === 0) {
+        return res
+          .status(200)
+          .json(
+            new ApiResponse(
+              200,
+              { updatedCount: 0 },
+              'No quizzes found with missing subjectId'
+            )
+          );
+      }
+
+      let updatedCount = 0;
+      const updatePromises = [];
+
+      // For each quiz with missing subjectId
+      for (const quiz of quizzesWithMissingSubjectId) {
+        if (quiz.topicId) {
+          // Find the subjectId through topicId
+          const topicResult = await db
+            .select({
+              subjectId: topicsTable.subjectId,
+            })
+            .from(topicsTable)
+            .where(eq(topicsTable.topicId, quiz.topicId))
+            .limit(1);
+
+          if (topicResult.length > 0) {
+            const subjectId = topicResult[0].subjectId;
+
+            // Update the quiz with the correct subjectId
+            const updatePromise = db
+              .update(quizzesTable)
+              .set({ subjectId: subjectId })
+              .where(eq(quizzesTable.quizId, quiz.quizId));
+
+            updatePromises.push(updatePromise);
+            updatedCount++;
+
+            console.log(
+              `✅ Quiz ${quiz.quizId} mapped to subject ${subjectId} via topic ${quiz.topicId}`
+            );
+          } else {
+            console.log(
+              `❌ Topic ${quiz.topicId} not found for quiz ${quiz.quizId}`
+            );
+          }
+        }
+      }
+
+      // Execute all updates
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        console.log(
+          `✅ Successfully updated ${updatedCount} quizzes with missing subjectId`
+        );
+      }
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            totalFound: quizzesWithMissingSubjectId.length,
+            updatedCount: updatedCount,
+            skippedCount: quizzesWithMissingSubjectId.length - updatedCount,
+          },
+          `Successfully fixed ${updatedCount} quizzes with missing subjectId`
+        )
+      );
+    } catch (error) {
+      console.error('Error fixing missing quiz subjectIds:', error);
       return res
         .status(500)
         .json(new ApiResponse(500, null, 'Internal server error'));

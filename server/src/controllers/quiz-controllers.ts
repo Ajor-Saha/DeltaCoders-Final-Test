@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
-import { quizMentalStatusTable } from '../db/schema/tbl-quiz-mental-status';
+import { cognitiveAssessmentsTable } from '../db/schema/tbl-cognitive-assessments';
 import { quizQuestionsTable } from '../db/schema/tbl-quiz-questions';
 import { quizResultsTable } from '../db/schema/tbl-quiz-results';
 import { quizzesTable } from '../db/schema/tbl-quizzes';
@@ -203,14 +203,14 @@ export const analyzeQuizMentalStatus = asyncHandler(
         const userId = (req as any)?.user?.userId as string | undefined;
         try {
           if (quizId && userId) {
-            await db.insert(quizMentalStatusTable).values({
-              id: uuidv4(),
+            await db.insert(cognitiveAssessmentsTable).values({
+              assessmentId: uuidv4(),
               userId,
               quizId,
-              weightedScore: Number(normalized.weighted_score ?? 0),
+              weightedScore: String(normalized.weighted_score ?? 0),
               attentionScore: Number(normalized.attention_score ?? 0),
               stressScore: Number(normalized.stress_score ?? 0),
-              cognitiveLoadScore: Number(normalized.cognitive_load_score ?? 0),
+              cognitiveScore: Number(normalized.cognitive_load_score ?? 0),
             });
           }
         } catch (e) {
@@ -237,14 +237,14 @@ export const analyzeQuizMentalStatus = asyncHandler(
           quizId &&
           userId
         ) {
-          await db.insert(quizMentalStatusTable).values({
-            id: uuidv4(),
+          await db.insert(cognitiveAssessmentsTable).values({
+            assessmentId: uuidv4(),
             userId,
             quizId,
-            weightedScore: Number(d.weighted_score ?? 0),
+            weightedScore: String(d.weighted_score ?? 0),
             attentionScore: Number(d.attention_score ?? 0),
             stressScore: Number(d.stress_score ?? 0),
-            cognitiveLoadScore: Number(d.cognitive_load_score ?? 0),
+            cognitiveScore: Number(d.cognitive_load_score ?? 0),
           });
         }
       } catch (e) {
