@@ -12,8 +12,10 @@ import {
   ArrowLeft,
   Bookmark,
   BookOpen,
+  CheckCircle,
   ChevronDown,
   ChevronRight,
+  Circle,
   Clock,
   FileText,
   HelpCircle,
@@ -73,8 +75,25 @@ export default function SubjectDetailPage() {
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [quizError, setQuizError] = useState<string>('');
   const [showGenerateTopicsModal, setShowGenerateTopicsModal] = useState(false);
+  const [topicProgress, setTopicProgress] = useState<{
+    completed_topics: string[];
+    total_topics: number;
+    total_completed_topics: number;
+  } | null>(null);
 
   const { isAuthenticated, accessToken } = useAuthStore();
+
+  // Helper function to check if a topic is completed
+  const isTopicCompleted = (topicId: string) => {
+    return topicProgress?.completed_topics?.includes(topicId) || false;
+  };
+
+  // Refresh topic progress after quiz completion
+  const refreshTopicProgress = async () => {
+    if (subjectDetail?.subjectId) {
+      await fetchTopicProgress(subjectDetail.subjectId);
+    }
+  };
 
   // Generate quiz function that can be called from QuizMaker
   const handleGenerateQuiz = async (topic: Topic, includeWeakness = false, weakness?: string) => {
@@ -158,6 +177,25 @@ export default function SubjectDetailPage() {
     }
   };
 
+  // Fetch topic progress
+  const fetchTopicProgress = async (subjectId: string) => {
+    if (!isAuthenticated || !accessToken) return;
+
+    try {
+      const response = await Axios.get(`/api/subject/progress/${subjectId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        setTopicProgress(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching topic progress:", error);
+    }
+  };
+
   // Find subject by name and get its details
   const fetchSubjectDetail = async () => {
     if (!isAuthenticated) return;
@@ -186,6 +224,8 @@ export default function SubjectDetailPage() {
 
           if (subjectDetailResponse.data.success) {
             setSubjectDetail(subjectDetailResponse.data.data);
+            // Fetch topic progress after getting subject details
+            await fetchTopicProgress(matchingSubject.subject.subjectId);
           }
         } else {
           toast.error("Subject not found");
@@ -398,11 +438,11 @@ export default function SubjectDetailPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Left Sidebar */}
-      <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+      <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <Link href="/subjects">
             <Button variant="ghost" size="sm" className="mb-4 p-0">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -413,7 +453,7 @@ export default function SubjectDetailPage() {
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">
               {subjectDetail.subjectName.charAt(0).toUpperCase()}
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                 {subjectDetail.subjectName}
               </h1>
@@ -578,7 +618,8 @@ export default function SubjectDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-6">
         {selectedContent.type === 'overview' ? (
           <div className="max-w-4xl">
             <div className="mb-6">
@@ -613,11 +654,11 @@ export default function SubjectDetailPage() {
 
               <Card>
                 <CardContent className="p-6 text-center">
-                  <Target className="w-8 h-8 mx-auto mb-2 text-purple-600" />
+                  <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-600" />
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {subjectDetail.topics.filter(t => t.difficulty === 'Easy').length}
+                    {topicProgress?.total_completed_topics || 0}/{topicProgress?.total_topics || subjectDetail.topics.length}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Easy Topics</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
                 </CardContent>
               </Card>
             </div>
@@ -654,6 +695,14 @@ export default function SubjectDetailPage() {
                       <p className="text-gray-600 dark:text-gray-400 text-sm">
                         {topic.description || "No description available"}
                       </p>
+                    </div>
+                    {/* Completion Status */}
+                    <div className="flex items-center">
+                      {isTopicCompleted(topic.topicId) ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Circle className="w-5 h-5 text-gray-400" />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -914,6 +963,7 @@ export default function SubjectDetailPage() {
             </Card>
           </div>
         )}
+        </div>
       </div>
 
       {/* Generate Topics Modal */}
