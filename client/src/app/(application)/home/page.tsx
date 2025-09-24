@@ -4,37 +4,37 @@ import FloatingChatbot from "@/components/chatbot/FloatingChatbot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { InfiniteSlider } from "@/components/ui/InfiniteSlider";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
-    BarChart3,
-    Brain,
-    ChevronRight,
-    GraduationCap,
-    Shield,
-    Target,
-    TrendingUp,
-    Users
+  BarChart3,
+  Brain,
+  ChevronRight,
+  GraduationCap,
+  Shield,
+  Target,
+  TrendingUp,
+  Users
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import {
-    Bar,
-    BarChart,
-    Cell,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
 } from "recharts";
 
 const fadeInUp = {
@@ -229,40 +229,29 @@ export default function StudyFlowLandingPage() {
             <div className="relative">
               <InfiniteSlider speedOnHover={20} speed={40} gap={112}>
                 <div className="flex items-center">
-                  <Image
-                    className="h-8 w-auto opacity-40 hover:opacity-70 transition-opacity filter grayscale hover:grayscale-0"
-                    src="https://logos-world.net/wp-content/uploads/2020/04/Harvard-Logo.png"
-                    alt="Harvard"
-                    height={32}
-                    width={120}
-                  />
+                  <span className="text-xl font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                    Harvard University
+                  </span>
                 </div>
                 <div className="flex items-center">
-                  <Image
-                    className="h-8 w-auto opacity-40 hover:opacity-70 transition-opacity filter grayscale hover:grayscale-0"
-                    src="https://logos-world.net/wp-content/uploads/2020/06/MIT-Logo.png"
-                    alt="MIT"
-                    height={32}
-                    width={120}
-                  />
+                  <span className="text-xl font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                    MIT
+                  </span>
                 </div>
                 <div className="flex items-center">
-                  <Image
-                    className="h-8 w-auto opacity-40 hover:opacity-70 transition-opacity filter grayscale hover:grayscale-0"
-                    src="https://logos-world.net/wp-content/uploads/2020/06/Stanford-Logo.png"
-                    alt="Stanford"
-                    height={32}
-                    width={120}
-                  />
+                  <span className="text-xl font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                    Stanford University
+                  </span>
                 </div>
                 <div className="flex items-center">
-                  <Image
-                    className="h-8 w-auto opacity-40 hover:opacity-70 transition-opacity filter grayscale hover:grayscale-0 dark:invert"
-                    src="https://logos-world.net/wp-content/uploads/2020/09/Google-Logo.png"
-                    alt="Google"
-                    height={32}
-                    width={120}
-                  />
+                  <span className="text-xl font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                    GeeksforGeeks
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-xl font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 transition-colors">
+                    Google
+                  </span>
                 </div>
               </InfiniteSlider>
               <ProgressiveBlur

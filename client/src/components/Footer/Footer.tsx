@@ -17,16 +17,16 @@ function Footer() {
             className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4 md:mb-0"
             whileHover={{ scale: 1.1 }}
           >
-            <i>TaskForge</i>
+            <i>StudyFlow</i>
           </motion.a>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600 dark:text-gray-400">
             {[
-              { text: "Projects", href: "#projects" },
-              { text: "Employee", href: "#employee" },
-              { text: "Stats", href: "#stats" },
-              { text: "Team", href: "#team" },
-              { text: "Testimonials", href: "#testimonials" },
-              { text: "Pricing", href: "#pricing" },
+              { text: "Courses", href: "/courses" },
+              { text: "AI Support", href: "#ai-support" },
+              { text: "Quizzes", href: "#quizzes" },
+              { text: "Progress", href: "#progress" },
+              { text: "Resources", href: "#resources" },
+              { text: "Games", href: "/games" },
             ].map((item, index) => (
               <motion.a
                 key={index}
@@ -61,8 +61,8 @@ function Footer() {
 
         <div className="flex flex-col md:flex-row justify-between items-center text-sm text-gray-500 dark:text-gray-400">
           <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-4 md:mb-0">
-            <span>&copy; 2025 TaskForge</span>
-            {["Terms", "Privacy", "Cookies"].map((item, index) => (
+            <span>&copy; 2025 EduLearn - Empowering Education Through Technology</span>
+            {["Terms", "Privacy", "Support"].map((item, index) => (
               <motion.a
                 key={index}
                 href="#"
@@ -77,9 +77,9 @@ function Footer() {
             {[
               "About",
               "Contact",
-              "Privacy",
-              "Terms",
-              "Cookies",
+              "Help Center",
+              "Community",
+              "Blog",
             ].map((item, index) => (
               <motion.a
                 key={index}
