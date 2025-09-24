@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import {
-    addUserSubject,
-    getAllSubjects,
-    getSubjectById,
-    getUserSubjects,
-    removeUserSubject,
-    updateUserSubjectLevel,
+  addUserSubject,
+  fixMissingQuizSubjectIds,
+  getAllSubjects,
+  getSubjectById,
+  getUserSubjects,
+  removeUserSubject,
+  updateUserSubjectLevel,
 } from '../controllers/subject-controllers';
 import { verifyJWT } from '../middleware/auth-middleware';
 
@@ -13,6 +14,7 @@ const subject_router = Router();
 
 // Public routes
 subject_router.route('/all').get(getAllSubjects);
+subject_router.route('/fix-quiz-subjects').post(fixMissingQuizSubjectIds);
 
 // Protected routes (require authentication)
 subject_router.route('/add-subject').post(verifyJWT, addUserSubject);

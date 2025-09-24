@@ -14,3 +14,4 @@ export * from './tbl-user';
 export * from './tbl-user-chat-messages';
 export * from './tbl-user-chats';
 export * from './tbl-user-subjects';
+export * from './tbl-weak-lessons';
