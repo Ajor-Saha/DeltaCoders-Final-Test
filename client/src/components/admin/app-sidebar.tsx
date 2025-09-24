@@ -102,7 +102,7 @@ const sidebarData = {
     },
     {
       title: "AI Support",
-      url: "/dashboard/ai-tutor",
+      url: "/ai-tutor",
       icon: <Bot size={20} />,
     },
   ],

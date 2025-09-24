@@ -16,8 +16,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Trophy,
-  XCircle
+  Trophy
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -559,7 +558,7 @@ export function QuizMaker({
         )}
 
         {/* Detailed Results */}
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Question Review</CardTitle>
             {quizState.weaknesses && quizState.weaknesses.length > 0 && (
@@ -608,7 +607,7 @@ export function QuizMaker({
               );
             })}
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     );
   }

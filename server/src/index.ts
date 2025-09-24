@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import logger from 'morgan';
+import aibot_router from './routes/aibot-route';
 import user_router from './routes/auth-route';
 import cognitive_assessment_router from './routes/cognitive-assessment-route';
 import question_router from './routes/question-route';
@@ -36,6 +37,8 @@ app.use('/api/topic', topic_router);
 app.use('/api', question_router);
 /// Mount resource route
 app.use('/api/resource', resource_router);
+// Mount aibot router
+app.use('/api/aibot', aibot_router);
 // Mount cognitive assessment router
 app.use('/api/cognitive-assessment', cognitive_assessment_router);
 

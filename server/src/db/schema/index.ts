@@ -9,4 +9,6 @@ export * from './tbl-short-questions';
 export * from './tbl-subjects';
 export * from './tbl-topics';
 export * from './tbl-user';
+export * from './tbl-user-chat-messages';
+export * from './tbl-user-chats';
 export * from './tbl-user-subjects';

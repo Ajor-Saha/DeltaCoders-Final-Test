@@ -75,7 +75,50 @@ export const createAllTopics = asyncHandler(
 
       const subjectRecord = existingSubject[0];
 
-      // Step 3: Save topics to database
+      // Check if topics already exist for this subject
+      const existingTopics = await db
+        .select({
+          topicId: topicsTable.topicId,
+          title: topicsTable.title,
+          description: topicsTable.description,
+          difficulty: topicsTable.difficulty,
+          createdAt: topicsTable.createdAt,
+        })
+        .from(topicsTable)
+        .where(eq(topicsTable.subjectId, subjectRecord.subjectId));
+
+      if (existingTopics.length > 0) {
+        // Topics already exist, return them instead of creating new ones
+        console.log(
+          `Found ${existingTopics.length} existing topics for subject: ${subject}`
+        );
+
+        return res.status(200).json(
+          new ApiResponse(
+            200,
+            {
+              subject: {
+                id: subjectRecord.subjectId,
+                name: subjectRecord.subjectName,
+              },
+              topics: existingTopics.map(topic => ({
+                id: topic.topicId,
+                title: topic.title,
+                description: topic.description,
+                difficulty: topic.difficulty,
+                createdAt: topic.createdAt,
+              })),
+              summary: {
+                totalTopics: existingTopics.length,
+              },
+              isExisting: true,
+            },
+            `Found ${existingTopics.length} existing topics for subject: ${subject}. No new topics created.`
+          )
+        );
+      }
+
+      // Step 3: Save topics to database (only if no existing topics found)
       const topicsToInsert = topicList.map((topic: any) => {
         // The API now returns objects with title, description, and difficulty
         let title: string;
@@ -138,8 +181,9 @@ export const createAllTopics = asyncHandler(
             summary: {
               totalTopics: insertedTopics.length,
             },
+            isExisting: false,
           },
-          `Successfully generated and saved ${insertedTopics.length} topics for subject: ${subject}`
+          `Successfully generated and saved ${insertedTopics.length} new topics for subject: ${subject}`
         )
       );
     } catch (error) {

@@ -17,7 +17,11 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.775.0",
     "@google/genai": "^1.20.0",
+    "@langchain/core": "^0.3.77",
+    "@langchain/openai": "^0.6.13",
+    "@langchain/pinecone": "^0.2.0",
     "@neondatabase/serverless": "^0.10.4",
+    "@pinecone-database/pinecone": "^5.1.2",
     "axios": "^1.12.2",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
