@@ -87,7 +87,7 @@ function Header() {
             href="/"
             className="text-sm sm:text-lg md:text-xl font-bold font-serif dark:text-white truncate max-w-[100px] xs:max-w-[140px] sm:max-w-full"
           >
-            TaskForge
+            StudyFlow
           </Link>
 
           {/* Center: Navigation Links (Hidden in Mobile) */}

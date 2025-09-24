@@ -23,13 +23,11 @@ import { Axios } from "@/config/axios";
 import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
-  BookOpen,
   Bot,
   Building2,
   FolderKanban,
   GalleryVerticalEnd,
   KeyRound,
-  LayoutGrid,
   List,
   Minus,
   Plus,
@@ -46,17 +44,6 @@ import { NavUser } from "./nav-user";
 const sidebarData = {
   navMain: [
     {
-      title: "StarterFeed",
-      url: "/starter-feed",
-      icon: <GalleryVerticalEnd size={20} />,
-    },
-    {
-      title: "Courses",
-      url: "/courses",
-      icon: <BookOpen size={20} />,
-    },
-
-    {
       title: "Subject",
       url: "/subjects",
       icon: <FolderKanban size={20} />,
@@ -70,11 +57,6 @@ const sidebarData = {
           title: "All Subjects",
           url: "/subjects",
           icon: <List size={16} />,
-        },
-        {
-          title: "Manage Subject",
-          url: "/subjects/manage-subject",
-          icon: <LayoutGrid size={16} />,
         },
       ],
     },
@@ -145,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <GalleryVerticalEnd className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">TaskForge</span>
+                  <span className="font-semibold">StudyFlow</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -156,11 +138,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <SidebarGroup>
           <Link
-            href="/starter-feed"
+            href="/dashboard"
             className="text-sm px-2 py-2 flex items-center gap-2 dark:bg-[#191919] dark:hover:bg-gray-800"
           >
             <GalleryVerticalEnd size={18} />
-            <span>StarterFeed</span>
+            <span>Dashboard</span>
           </Link>
         </SidebarGroup>
         <SidebarGroup>
