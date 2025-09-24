@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import axios from 'axios';
 import { eq, sql } from 'drizzle-orm';
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -144,3 +145,76 @@ export const submitQuiz = asyncHandler(async (req: Request, res: Response) => {
       .json(new ApiResponse(500, null, 'Error submitting quiz'));
   }
 });
+
+export const analyzeQuizMentalStatus = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const url = process.env.MENTAL_STATUS_URL;
+      if (!url) {
+        return res
+          .status(500)
+          .json(
+            new ApiResponse(500, null, 'MENTAL_STATUS_URL is not configured')
+          );
+      }
+
+      const payload = req.body;
+
+      // Basic validation for expected fields (non-blocking; pass-through if missing)
+      if (!payload || typeof payload !== 'object') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, null, 'Invalid payload'));
+      }
+
+      const agentResp = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 20000,
+      });
+
+      let data: any = agentResp?.data;
+      let normalized: any = null;
+
+      try {
+        if (typeof data === 'string') {
+          normalized = JSON.parse(data);
+        } else if (
+          data?.result?.Output &&
+          typeof data.result.Output === 'string'
+        ) {
+          normalized = JSON.parse(data.result.Output);
+        }
+      } catch (e) {
+        // If parsing fails, we'll pass through the original data
+        normalized = null;
+      }
+
+      // If the normalized object appears to contain the expected scores, return it directly
+      if (
+        normalized &&
+        typeof normalized === 'object' &&
+        ('weighted_score' in normalized ||
+          'attention_score' in normalized ||
+          'stress_score' in normalized ||
+          'cognitive_load_score' in normalized)
+      ) {
+        return res
+          .status(200)
+          .json(new ApiResponse(200, normalized, 'Mental status computed'));
+      }
+
+      // Otherwise, return the raw agent response data so the client can handle it
+      return res
+        .status(200)
+        .json(new ApiResponse(200, data, 'Mental status computed'));
+    } catch (error: any) {
+      console.error(
+        'Error analyzing mental status:',
+        error?.response?.data || error?.message || error
+      );
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Failed to analyze mental status'));
+    }
+  }
+);
