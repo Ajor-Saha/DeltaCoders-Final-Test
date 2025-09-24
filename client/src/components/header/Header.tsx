@@ -101,14 +101,17 @@ function Header() {
             <Link href="/courses" className="dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Courses
             </Link>
-            <a href="#stats" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Stats
+            <a href="#ai-support" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              AI Support
             </a>
-            <a href="#team" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Team
+            <a href="#quizzes" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              Quizzes
             </a>
-            <a href="#testimonials" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Testimonials
+            <a href="#progress" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              Progress
+            </a>
+            <a href="#resources" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
+              Resources
             </a>
             <Link href="/games" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Games
@@ -201,26 +204,40 @@ function Header() {
               Courses
             </Link>
             <a
-              href="#stats"
+              href="#ai-support"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
               onClick={closeMenu}
             >
-              Stats
+              AI Support
             </a>
             <a
-              href="#team"
+              href="#quizzes"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
               onClick={closeMenu}
             >
-              Team
+              Quizzes
             </a>
             <a
-              href="#testimonials"
+              href="#progress"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
               onClick={closeMenu}
             >
-              Testimonials
+              Progress
             </a>
+            <a
+              href="#resources"
+              className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
+              onClick={closeMenu}
+            >
+              Resources
+            </a>
+            <Link
+              href="/games"
+              className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
+              onClick={closeMenu}
+            >
+              Games
+            </Link>
             <a
               href="#pricing"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
