@@ -189,16 +189,29 @@ export function QuizMaker({
 
   // Timer effect
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (quizState.quizStarted && !quizState.showResults && quizState.timeLeft > 0) {
+    let timer: NodeJS.Timeout | undefined;
+    const canTick =
+      quizState.quizStarted &&
+      !quizState.showResults &&
+      !quizState.isSubmitting &&
+      quizState.timeLeft > 0;
+
+    if (canTick) {
       timer = setTimeout(() => {
         setQuizState(prev => ({ ...prev, timeLeft: prev.timeLeft - 1 }));
       }, 1000);
-    } else if (quizState.timeLeft === 0 && quizState.quizStarted && !quizState.showResults) {
+    } else if (
+      quizState.timeLeft === 0 &&
+      quizState.quizStarted &&
+      !quizState.showResults &&
+      !quizState.isSubmitting
+    ) {
       handleSubmitQuiz();
     }
-    return () => clearTimeout(timer);
-  }, [quizState.timeLeft, quizState.quizStarted, quizState.showResults]);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [quizState.timeLeft, quizState.quizStarted, quizState.showResults, quizState.isSubmitting]);
 
   const startQuiz = () => {
     if (!quizData?.questions?.length) return;
@@ -251,6 +264,8 @@ export function QuizMaker({
   };
 
   const handleSubmitQuiz = async () => {
+    // Prevent duplicate submissions and stop timer race conditions
+    if (quizState.isSubmitting || quizState.showResults) return;
     if (!quizData?.questions || !accessToken) return;
 
     setQuizState(prev => ({ ...prev, isSubmitting: true }));
