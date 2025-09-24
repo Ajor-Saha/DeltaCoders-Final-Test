@@ -19,6 +19,7 @@ import {
   Trophy
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 
 interface QuizQuestion {
@@ -68,6 +69,8 @@ interface QuizState {
   selectedAnswers: { [key: number]: string };
   showResults: boolean;
   score: number;
+  correctCount?: number;
+  totalQuestions?: number;
   timeLeft: number;
   quizStarted: boolean;
   isSubmitting: boolean;
@@ -273,7 +276,7 @@ export function QuizMaker({
       });
 
       if (response.data.success) {
-        const { score, feedback, weaknesses } = response.data.data;
+        const { score, feedback, weaknesses, correctAnswers: serverCorrectCount, totalQuestions: serverTotalQuestions } = response.data.data;
 
         // Compute detailed correctness for mental status payload
         const questionsPayload = quizData.questions.map((q, index) => ({
@@ -284,7 +287,7 @@ export function QuizMaker({
 
         // Compute totals based on selections
         const totalCorrect = questionsPayload.filter(q => q.correct).length;
-        const totalQuestions = quizData.questions.length;
+  const totalQuestions = quizData.questions.length;
 
         // Derive weakness topics: use incorrect question texts
         const weaknessTopics: string[] = quizData.questions
@@ -337,11 +340,12 @@ export function QuizMaker({
         // Store weakness summary for future quiz generation
         const weaknessSummary = weaknesses?.map((w: any) => w.question).join(', ') || '';
 
-        console.log("mentalScores:", mentalScores);
         setQuizState(prev => ({
           ...prev,
           showResults: true,
           score,
+          correctCount: serverCorrectCount ?? undefined,
+          totalQuestions: serverTotalQuestions ?? undefined,
           feedback,
           weaknesses,
           mentalScores,
@@ -509,9 +513,12 @@ export function QuizMaker({
 
   // Quiz results view
   if (quizState.showResults) {
-    const correctAnswers = quizData.questions.filter(
+    // Prefer server-provided counts to avoid mismatch with local selection state
+    const fallbackCorrect = quizData.questions.filter(
       (question, index) => quizState.selectedAnswers[index] === question.correctAnswer
     ).length;
+    const correctAnswers = quizState.correctCount ?? fallbackCorrect;
+    const totalQs = quizState.totalQuestions ?? quizData.questions.length;
 
     return (
       <div className="space-y-6">
@@ -553,9 +560,82 @@ export function QuizMaker({
             <CardContent className="border-t border-gray-200 dark:border-gray-800 mt-4 pt-4">
               <div className="prose dark:prose-invert max-w-none">
                 <h3 className="text-lg font-semibold mb-2">Feedback & Analysis</h3>
-                <div className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                  {quizState.feedback}
-                </div>
+                <div className="prose dark:prose-invert max-w-none prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700">
+                          <ReactMarkdown
+                            components={{
+                              h1: ({ children }) => (
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4 mt-6">
+                                  {children}
+                                </h1>
+                              ),
+                              h2: ({ children }) => (
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3 mt-5">
+                                  {children}
+                                </h2>
+                              ),
+                              h3: ({ children }) => (
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 mt-4">
+                                  {children}
+                                </h3>
+                              ),
+                              p: ({ children }) => (
+                                <p className="text-gray-700 dark:text-gray-300 mb-4 leading-relaxed">
+                                  {children}
+                                </p>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="list-disc list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </ul>
+                              ),
+                              ol: ({ children }) => (
+                                <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </ol>
+                              ),
+                              li: ({ children }) => (
+                                <li className="text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </li>
+                              ),
+                              code: ({ children, className }) => {
+                                const isInline = !className;
+                                return isInline ? (
+                                  <code className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded text-sm font-mono">
+                                    {children}
+                                  </code>
+                                ) : (
+                                  <code className={className}>
+                                    {children}
+                                  </code>
+                                );
+                              },
+                              pre: ({ children }) => (
+                                <pre className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4 overflow-x-auto">
+                                  {children}
+                                </pre>
+                              ),
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-blue-500 pl-4 py-2 mb-4 bg-blue-50 dark:bg-blue-900/20 text-gray-700 dark:text-gray-300 italic">
+                                  {children}
+                                </blockquote>
+                              ),
+                              strong: ({ children }) => (
+                                <strong className="font-semibold text-gray-900 dark:text-gray-100">
+                                  {children}
+                                </strong>
+                              ),
+                              em: ({ children }) => (
+                                <em className="italic text-gray-700 dark:text-gray-300">
+                                  {children}
+                                </em>
+                              ),
+                            }}
+                          >
+                            {quizState.feedback}
+                          </ReactMarkdown>
+                        </div>
+
               </div>
             </CardContent>
           )}
@@ -566,7 +646,7 @@ export function QuizMaker({
                 {quizState.score}%
               </div>
               <p className="text-gray-600 dark:text-gray-400">
-                {correctAnswers} out of {quizData.questions.length} correct
+                {correctAnswers} out of {totalQs} correct
               </p>
             </div>
 
@@ -574,9 +654,9 @@ export function QuizMaker({
             <div className="space-y-2">
               <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>Progress</span>
-                <span>{correctAnswers}/{quizData.questions.length}</span>
+                <span>{correctAnswers}/{totalQs}</span>
               </div>
-              <Progress value={(correctAnswers / quizData.questions.length) * 100} className="h-3" />
+              <Progress value={(correctAnswers / totalQs) * 100} className="h-3" />
             </div>
 
             {/* Action Buttons */}
