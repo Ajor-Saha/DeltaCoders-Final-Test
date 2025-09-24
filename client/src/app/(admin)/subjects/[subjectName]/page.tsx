@@ -18,7 +18,8 @@ import {
   HelpCircle,
   PlayCircle,
   RefreshCw,
-  Target
+  Target,
+  TrendingDown
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 import { QuizMaker } from "../_components/quiz-maker";
 import { Resources } from "../_components/resources";
 import { ShortQuestions } from "../_components/short-questions";
+import { WeakLessons } from "../_components/weak-lessons";
 
 interface Topic {
   topicId: string;
@@ -57,7 +59,7 @@ export default function SubjectDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [selectedContent, setSelectedContent] = useState<{
-    type: 'overview' | 'learnings' | 'lessons' | 'quiz' | 'short-questions' | 'resources';
+    type: 'overview' | 'learnings' | 'lessons' | 'quiz' | 'short-questions' | 'resources' | 'weakness';
     topicId?: string;
     topic?: Topic;
   }>({ type: 'overview' });
@@ -454,6 +456,21 @@ export default function SubjectDetailPage() {
               <div className="flex items-center gap-2">
                 <Bookmark className="w-4 h-4" />
                 <span className="font-medium">Resources</span>
+              </div>
+            </button>
+
+            {/* Weakness Topics */}
+            <button
+              onClick={() => setSelectedContent({ type: 'weakness' })}
+              className={`w-full text-left p-3 rounded-lg transition-colors ${
+                selectedContent.type === 'weakness'
+                  ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <TrendingDown className="w-4 h-4 text-red-500" />
+                <span className="font-medium">Weakness Topics</span>
               </div>
             </button>
 
@@ -859,6 +876,13 @@ export default function SubjectDetailPage() {
                    <Resources
                      topicId={selectedContent.topicId}
                      topic={selectedContent.topic}
+                     subjectId={subjectDetail.subjectId}
+                     subjectName={subjectDetail.subjectName}
+                   />
+                 )}
+
+                 {selectedContent.type === 'weakness' && (
+                   <WeakLessons
                      subjectId={subjectDetail.subjectId}
                      subjectName={subjectDetail.subjectName}
                    />
