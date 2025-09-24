@@ -901,3 +901,94 @@ Generate an exam that effectively assesses student understanding across all topi
     }
   }
 );
+
+// Delete a short question exam and all its questions
+export const deleteShortQuestionExam = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { examId } = req.params;
+      const userId = req.user.userId;
+
+      if (!examId || examId.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Exam ID is required'));
+      }
+
+      // Check if exam exists and belongs to the user
+      const existingExam = await db
+        .select()
+        .from(shortQuestionExamsTable)
+        .where(
+          and(
+            eq(shortQuestionExamsTable.examId, examId),
+            eq(shortQuestionExamsTable.userId, userId)
+          )
+        )
+        .limit(1);
+
+      if (existingExam.length === 0) {
+        return res
+          .status(404)
+          .json(
+            new ApiResponse(
+              404,
+              {},
+              'Exam not found or you do not have permission to delete it'
+            )
+          );
+      }
+
+      const exam = existingExam[0];
+
+      // Get count of questions before deletion for confirmation
+      const questionsToDelete = await db
+        .select()
+        .from(shortQuestionsTable)
+        .where(eq(shortQuestionsTable.examId, examId));
+
+      console.log(
+        `Deleting exam ${examId} with ${questionsToDelete.length} questions`
+      );
+
+      // Delete all questions first (due to foreign key constraint)
+      await db
+        .delete(shortQuestionsTable)
+        .where(eq(shortQuestionsTable.examId, examId));
+
+      // Then delete the exam
+      await db
+        .delete(shortQuestionExamsTable)
+        .where(
+          and(
+            eq(shortQuestionExamsTable.examId, examId),
+            eq(shortQuestionExamsTable.userId, userId)
+          )
+        );
+
+      console.log(
+        `Successfully deleted exam ${examId} and ${questionsToDelete.length} associated questions`
+      );
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            deletedExamId: examId,
+            deletedQuestionsCount: questionsToDelete.length,
+            examDetails: {
+              totalQuestions: exam.totalQuestions,
+              totalMarks: exam.totalMarks,
+              wasCompleted: exam.isCompleted === 1,
+              createdAt: exam.createdAt,
+            },
+          },
+          `Successfully deleted exam and ${questionsToDelete.length} associated questions`
+        )
+      );
+    } catch (error) {
+      console.error('Error deleting short question exam:', error);
+      res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);

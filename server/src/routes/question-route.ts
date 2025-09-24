@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createShortQuestionExam,
+  deleteShortQuestionExam,
   getExamQuestions,
   getShortQuestionExams,
   submitExamAnswers,
@@ -25,5 +26,9 @@ question_router
 question_router
   .route('/short-questions/exam/:examId/submit')
   .post(verifyJWT, submitExamAnswers);
+
+question_router
+  .route('/short-questions/exam/:examId')
+  .delete(verifyJWT, deleteShortQuestionExam);
 
 export default question_router;

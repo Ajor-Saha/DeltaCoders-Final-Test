@@ -1,5 +1,6 @@
 "use client";
 
+import GenerateTopicsModal from "@/app/(admin)/subjects/_components/generate-topics-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   FileText,
   HelpCircle,
   PlayCircle,
+  Plus,
   RefreshCw,
   Target,
   TrendingDown
@@ -70,6 +72,7 @@ export default function SubjectDetailPage() {
   const [quizData, setQuizData] = useState<any>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [quizError, setQuizError] = useState<string>('');
+  const [showGenerateTopicsModal, setShowGenerateTopicsModal] = useState(false);
 
   const { isAuthenticated, accessToken } = useAuthStore();
 
@@ -193,6 +196,16 @@ export default function SubjectDetailPage() {
       toast.error("Failed to load subject details");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle new topics generated from modal
+  const handleTopicsGenerated = (newTopics: Topic[]) => {
+    if (subjectDetail) {
+      setSubjectDetail({
+        ...subjectDetail,
+        topics: [...subjectDetail.topics, ...newTopics]
+      });
     }
   };
 
@@ -611,7 +624,17 @@ export default function SubjectDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Course Topics</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Course Topics</CardTitle>
+                  <Button
+                    onClick={() => setShowGenerateTopicsModal(true)}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Generate Topics
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {subjectDetail.topics.map((topic, index) => (
@@ -892,6 +915,15 @@ export default function SubjectDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Generate Topics Modal */}
+      <GenerateTopicsModal
+        isOpen={showGenerateTopicsModal}
+        onClose={() => setShowGenerateTopicsModal(false)}
+        subjectId={subjectDetail?.subjectId || ''}
+        subjectName={subjectDetail?.subjectName || ''}
+        onTopicsGenerated={handleTopicsGenerated}
+      />
     </div>
   );
 }

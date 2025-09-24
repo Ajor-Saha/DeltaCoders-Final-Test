@@ -16,7 +16,8 @@ import {
   HelpCircle,
   Plus,
   RefreshCw,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -62,6 +63,7 @@ export function ShortQuestions({ topicId, topic, subjectId, subjectName }: Short
   const [searchTerm, setSearchTerm] = useState("");
   const [userAnswers, setUserAnswers] = useState<{[key: string]: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingExamId, setDeletingExamId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -214,6 +216,50 @@ export function ShortQuestions({ topicId, topic, subjectId, subjectName }: Short
       toast.error("Failed to submit exam");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const deleteExam = async (examId: string) => {
+    if (!accessToken) {
+      toast.error("Please log in to delete an exam");
+      return;
+    }
+
+    // Confirm deletion
+    if (!confirm("Are you sure you want to delete this exam? This action cannot be undone.")) {
+      return;
+    }
+
+    setDeletingExamId(examId);
+    try {
+      const response = await Axios.delete(`/api/short-questions/exam/${examId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        const result = response.data.data;
+        toast.success(
+          `Exam deleted successfully! Removed ${result.deletedQuestionsCount} questions.`
+        );
+
+        // If we're currently viewing this exam, go back to exam list
+        if (selectedExam && selectedExam.id === examId) {
+          setSelectedExam(null);
+          setQuestions([]);
+          setUserAnswers({});
+        }
+
+        // Refresh exam list
+        await fetchExams();
+      }
+    } catch (error: any) {
+      console.error('Error deleting exam:', error);
+      const errorMessage = error.response?.data?.message || "Failed to delete exam";
+      toast.error(errorMessage);
+    } finally {
+      setDeletingExamId(null);
     }
   };
 
@@ -519,28 +565,49 @@ export function ShortQuestions({ topicId, topic, subjectId, subjectName }: Short
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {exams.map((exam) => (
-              <Card key={exam.id} className="hover:shadow-lg transition-all duration-200 cursor-pointer"
-                    onClick={() => fetchExamQuestions(exam.id)}>
+              <Card key={exam.id} className="hover:shadow-lg transition-all duration-200 relative">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="w-5 h-5" />
                       Exam #{exam.id.slice(-4)}
                     </CardTitle>
-                    {exam.isCompleted ? (
-                      <Badge className="bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Completed
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-orange-100 text-orange-800">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Pending
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {exam.isCompleted ? (
+                        <Badge className="bg-green-100 text-green-800">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Completed
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-orange-100 text-orange-800">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Pending
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteExam(exam.id);
+                        }}
+                        disabled={deletingExamId === exam.id}
+                        title="Delete exam"
+                      >
+                        {deletingExamId === exam.id ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent
+                  className="space-y-4 cursor-pointer"
+                  onClick={() => fetchExamQuestions(exam.id)}
+                >
                   <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>{exam.totalQuestions} Questions</span>
                     <span>{exam.totalMarks} Marks</span>

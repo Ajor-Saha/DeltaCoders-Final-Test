@@ -1,9 +1,9 @@
 import { GoogleGenAI } from '@google/genai';
 import { and, eq } from 'drizzle-orm';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db';
-import { lessonsTable } from '../db/schema/tbl-lessons';
+import { quizQuestionsTable } from '../db/schema/tbl-quiz-questions';
 import { quizResultsTable } from '../db/schema/tbl-quiz-results';
 import { quizzesTable } from '../db/schema/tbl-quizzes';
 import { subjectsTable } from '../db/schema/tbl-subjects';
@@ -12,8 +12,136 @@ import { weakLessonsTable } from '../db/schema/tbl-weak-lessons';
 import { ApiResponse } from '../utils/api-response';
 import { asyncHandler } from '../utils/asyncHandler';
 
+// Helper function to generate study schedule recommendations
+const generateStudySchedule = async (
+  genAI: any,
+  weakTopics: any[],
+  totalStudyTime: string,
+  subjectName: string
+) => {
+  if (weakTopics.length === 0) return null;
+
+  const schedulePrompt = `Create a personalized study schedule for a student who needs to improve in these topics:
+
+SUBJECT: ${subjectName}
+WEAK TOPICS: ${weakTopics
+    .map(topic => `${topic.title} (${topic.averagePerformance}%)`)
+    .join(', ')}
+ESTIMATED TOTAL TIME: ${totalStudyTime}
+NUMBER OF TOPICS: ${weakTopics.length}
+
+Create a realistic weekly study schedule that:
+1. Prioritizes topics based on performance (worst performance first)
+2. Balances daily study time (30-60 minutes per session)
+3. Includes review and practice time
+4. Provides specific daily goals
+
+REQUIRED OUTPUT FORMAT:
+{
+  "weeklySchedule": {
+    "totalWeeks": 2,
+    "studyDaysPerWeek": 5,
+    "averageDailyTime": "45 minutes",
+    "week1": {
+      "monday": {"topic": "Topic Name", "activities": ["Activity 1", "Activity 2"], "duration": "45 min"},
+      "tuesday": {"topic": "Topic Name", "activities": ["Activity 1", "Activity 2"], "duration": "30 min"},
+      "wednesday": {"topic": "Topic Name", "activities": ["Activity 1", "Activity 2"], "duration": "60 min"},
+      "thursday": {"topic": "Topic Name", "activities": ["Activity 1", "Activity 2"], "duration": "45 min"},
+      "friday": {"topic": "Review", "activities": ["Review all topics", "Practice questions"], "duration": "30 min"}
+    },
+    "week2": {
+      "monday": {"topic": "Topic Name", "activities": ["Advanced practice", "Self-assessment"], "duration": "45 min"},
+      "tuesday": {"topic": "Topic Name", "activities": ["Problem solving", "Review mistakes"], "duration": "45 min"},
+      "wednesday": {"topic": "Topic Name", "activities": ["Concept reinforcement"], "duration": "30 min"},
+      "thursday": {"topic": "Mixed Review", "activities": ["All topics review", "Practice test"], "duration": "60 min"},
+      "friday": {"topic": "Final Assessment", "activities": ["Self-evaluation", "Next steps planning"], "duration": "30 min"}
+    }
+  },
+  "studyTips": [
+    "Tip 1 for effective studying",
+    "Tip 2 for retention",
+    "Tip 3 for practice"
+  ],
+  "milestones": [
+    {"week": 1, "goal": "Complete concept review for all weak topics"},
+    {"week": 2, "goal": "Achieve 75%+ accuracy in practice questions"}
+  ]
+}
+
+Return ONLY the JSON response.`;
+
+  try {
+    const scheduleResult = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: schedulePrompt,
+    });
+
+    const scheduleText = scheduleResult.text;
+    const cleanedScheduleResponse = (scheduleText || '')
+      .replace(/```json|```/g, '')
+      .trim();
+    return JSON.parse(cleanedScheduleResponse);
+  } catch (error) {
+    console.error('Error generating study schedule:', error);
+    return null;
+  }
+};
+const generatePracticeQuestions = async (
+  genAI: any,
+  weakTopic: any,
+  subjectName: string,
+  userMistakes: string[]
+) => {
+  const practicePrompt = `Generate 5 practice questions for a student struggling with this topic:
+
+SUBJECT: ${subjectName}
+TOPIC: ${weakTopic.title}
+DIFFICULTY: ${weakTopic.difficulty}
+STUDENT'S COMMON MISTAKES: ${userMistakes.join(', ')}
+
+Generate questions that specifically address the student's weak areas and common mistakes.
+Include a mix of difficulty levels (2 easy, 2 medium, 1 challenging).
+
+REQUIRED OUTPUT FORMAT:
+{
+  "practiceQuestions": [
+    {
+      "question": "Question text",
+      "options": {
+        "A": "Option A",
+        "B": "Option B",
+        "C": "Option C",
+        "D": "Option D"
+      },
+      "correctAnswer": "A",
+      "explanation": "Detailed explanation of why this is correct",
+      "difficulty": "Easy/Medium/Hard",
+      "targetedWeakness": "What specific weakness this addresses"
+    }
+  ]
+}
+
+Return ONLY the JSON response.`;
+
+  try {
+    const practiceResult = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: practicePrompt,
+    });
+
+    const practiceText = practiceResult.text;
+    const cleanedPracticeResponse = (practiceText || '')
+      .replace(/```json|```/g, '')
+      .trim();
+    return JSON.parse(cleanedPracticeResponse);
+  } catch (error) {
+    console.error('Error generating practice questions:', error);
+    return { practiceQuestions: [] };
+  }
+};
+
 export const generateWeakLessons = asyncHandler(
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { subjectId } = req.params;
       const userId = req.user.userId;
@@ -60,25 +188,24 @@ export const generateWeakLessons = asyncHandler(
         `Found ${topics.length} topics for subject: ${subject.subjectName}`
       );
 
-      // First, get all quiz attempts by this user for this subject
-      const userQuizAttempts = await db
+      // Get all quiz attempts with detailed question analysis
+      const userQuizData = await db
         .select({
-          resultId: quizResultsTable.resultId,
-          score: quizResultsTable.score,
-          totalMarks: quizResultsTable.totalMarks,
-          completedAt: quizResultsTable.completedAt,
           quizId: quizzesTable.quizId,
           topicId: quizzesTable.topicId,
           topicTitle: topicsTable.title,
           topicDescription: topicsTable.description,
-          difficulty: topicsTable.difficulty,
+          topicDifficulty: topicsTable.difficulty,
+          score: quizResultsTable.score,
+          totalMarks: quizResultsTable.totalMarks,
+          completedAt: quizResultsTable.completedAt,
         })
-        .from(quizResultsTable)
-        .innerJoin(
-          quizzesTable,
-          eq(quizResultsTable.quizId, quizzesTable.quizId)
-        )
+        .from(quizzesTable)
         .innerJoin(topicsTable, eq(quizzesTable.topicId, topicsTable.topicId))
+        .leftJoin(
+          quizResultsTable,
+          eq(quizzesTable.quizId, quizResultsTable.quizId)
+        )
         .where(
           and(
             eq(quizzesTable.userId, userId),
@@ -87,19 +214,10 @@ export const generateWeakLessons = asyncHandler(
         );
 
       console.log(
-        `Found ${userQuizAttempts.length} quiz attempts by user for this subject`
+        `Found ${userQuizData.length} quiz attempts by user for this subject`
       );
 
-      if (userQuizAttempts.length === 0) {
-        // Get all topics info for context even if no quizzes attempted
-        const allTopicsInfo = topics.map(topic => ({
-          topicId: topic.topicId,
-          title: topic.title,
-          description: topic.description || 'No description available',
-          difficulty: topic.difficulty,
-          hasAttempts: false,
-        }));
-
+      if (userQuizData.length === 0) {
         return res.status(200).json(
           new ApiResponse(
             200,
@@ -115,7 +233,13 @@ export const generateWeakLessons = asyncHandler(
                 message:
                   'No quiz attempts found for this subject. Please complete some quizzes first to identify weak areas.',
               },
-              topics: allTopicsInfo,
+              topics: topics.map(topic => ({
+                topicId: topic.topicId,
+                title: topic.title,
+                description: topic.description || 'No description available',
+                difficulty: topic.difficulty,
+                hasAttempts: false,
+              })),
               weakTopics: [],
             },
             'No quiz attempts found for analysis'
@@ -123,443 +247,92 @@ export const generateWeakLessons = asyncHandler(
         );
       }
 
-      // Group quiz attempts by topic to analyze performance
-      const topicPerformanceMap = new Map();
+      // Get detailed question analysis for all attempted quizzes
+      console.log(
+        'Getting detailed question analysis for weakness detection...'
+      );
 
-      userQuizAttempts.forEach(attempt => {
-        const topicId = attempt.topicId;
-        if (!topicPerformanceMap.has(topicId)) {
-          topicPerformanceMap.set(topicId, {
-            topicId: attempt.topicId,
-            title: attempt.topicTitle,
-            description: attempt.topicDescription || 'No description available',
-            difficulty: attempt.difficulty,
-            attempts: [],
-            totalScore: 0,
-            totalPossible: 0,
-          });
-        }
+      interface QuizAnalysisData {
+        quizId: string;
+        topicId: string | null;
+        topicTitle: string | null;
+        topicDescription: string | null;
+        topicDifficulty: string | null;
+        completedAt: Date | null;
+        totalQuestions: number;
+        correctAnswers: number;
+        percentage: number;
+        questions: Array<{
+          question: string;
+          optionA: string | null;
+          optionB: string | null;
+          optionC: string | null;
+          optionD: string | null;
+          correctAnswer: string;
+          userChoice: string | null;
+          isCorrect: boolean;
+          difficulty: string | null;
+        }>;
+      }
 
-        const topicData = topicPerformanceMap.get(topicId);
-        topicData.attempts.push({
-          score: attempt.score,
-          totalMarks: attempt.totalMarks,
-          completedAt: attempt.completedAt,
-        });
-        topicData.totalScore += attempt.score;
-        topicData.totalPossible += attempt.totalMarks;
-      });
+      const quizAnalysisData: QuizAnalysisData[] = [];
 
-      // Analyze performance and identify weak topics
-      const weakTopics = [];
-      const attemptedTopics = [];
-      const poorPerformanceThreshold = 95; // Below 60% is considered poor
-
-      for (const [topicId, topicData] of topicPerformanceMap.entries()) {
-        const averagePercentage =
-          topicData.totalPossible > 0
-            ? (topicData.totalScore / topicData.totalPossible) * 100
-            : 0;
+      for (const quiz of userQuizData) {
+        if (!quiz.quizId) continue; // Skip if no quiz result exists
 
         console.log(
-          `Topic ${topicData.title}: ${averagePercentage.toFixed(
+          `Analyzing quiz ${quiz.quizId} for topic: ${quiz.topicTitle}`
+        );
+
+        // Get all questions for this quiz with user answers
+        const questionsWithAnswers = await db
+          .select()
+          .from(quizQuestionsTable)
+          .where(eq(quizQuestionsTable.quizId, quiz.quizId));
+
+        console.log(
+          `Found ${questionsWithAnswers.length} questions for this quiz`
+        );
+
+        // Analyze each question
+        const questionAnalysis = questionsWithAnswers.map(q => ({
+          question: q.question,
+          optionA: q.optionA,
+          optionB: q.optionB,
+          optionC: q.optionC,
+          optionD: q.optionD,
+          correctAnswer: q.correctAnswer,
+          userChoice: q.userChoice || 'No answer provided',
+          isCorrect: q.userChoice === q.correctAnswer,
+          difficulty: q.difficulty,
+        }));
+
+        const correctAnswers = questionAnalysis.filter(q => q.isCorrect).length;
+        const totalQuestions = questionAnalysis.length;
+        const percentage =
+          totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+
+        console.log(
+          `Quiz performance: ${correctAnswers}/${totalQuestions} = ${percentage.toFixed(
             1
-          )}% average performance (${topicData.attempts.length} attempts)`
+          )}%`
         );
 
-        attemptedTopics.push({
-          topicId: topicData.topicId,
-          title: topicData.title,
-          description: topicData.description,
-          difficulty: topicData.difficulty,
-          averagePerformance: Math.round(averagePercentage),
-          quizAttempts: topicData.attempts.length,
-          isWeak: averagePercentage < poorPerformanceThreshold,
+        quizAnalysisData.push({
+          quizId: quiz.quizId,
+          topicId: quiz.topicId,
+          topicTitle: quiz.topicTitle,
+          topicDescription: quiz.topicDescription,
+          topicDifficulty: quiz.topicDifficulty,
+          completedAt: quiz.completedAt,
+          totalQuestions: totalQuestions,
+          correctAnswers: correctAnswers,
+          percentage: Math.round(percentage),
+          questions: questionAnalysis,
         });
-
-        if (averagePercentage < poorPerformanceThreshold) {
-          // Get lesson content for this weak topic
-          const lessons = await db
-            .select()
-            .from(lessonsTable)
-            .where(eq(lessonsTable.topicId, topicData.topicId));
-
-          const lessonContent =
-            lessons.length > 0
-              ? lessons.map(lesson => lesson.content).join('\n\n')
-              : `Topic: ${topicData.title}\nDescription: ${topicData.description}\nDifficulty: ${topicData.difficulty}\n\nNo detailed lesson content available. This topic requires further study.`;
-
-          weakTopics.push({
-            topicId: topicData.topicId,
-            title: topicData.title,
-            description: topicData.description,
-            difficulty: topicData.difficulty,
-            averagePerformance: Math.round(averagePercentage),
-            quizAttempts: topicData.attempts.length,
-            lessonContent: lessonContent,
-            lastAttempt:
-              topicData.attempts[topicData.attempts.length - 1]?.completedAt,
-          });
-        }
       }
 
-      // Also include topics that haven't been attempted for context
-      const unattemptedTopics = topics
-        .filter(topic => !topicPerformanceMap.has(topic.topicId))
-        .map(topic => ({
-          topicId: topic.topicId,
-          title: topic.title,
-          description: topic.description || 'No description available',
-          difficulty: topic.difficulty,
-          status: 'not_attempted',
-        }));
-
-      if (weakTopics.length === 0) {
-        return res.status(200).json(
-          new ApiResponse(
-            200,
-            {
-              subject: {
-                id: subject.subjectId,
-                name: subject.subjectName,
-              },
-              analysis: {
-                totalTopics: topics.length,
-                attemptedTopics: attemptedTopics.length,
-                weakTopics: 0,
-                averageOverallPerformance: Math.round(
-                  attemptedTopics.reduce(
-                    (sum, topic) => sum + topic.averagePerformance,
-                    0
-                  ) / (attemptedTopics.length || 1)
-                ),
-              },
-              attemptedTopics,
-              unattemptedTopics,
-              weakTopics: [],
-              message:
-                'Great job! No weak areas identified based on quiz performance.',
-            },
-            'No weak topics found based on quiz performance'
-          )
-        );
-      }
-
-      console.log(
-        `Found ${weakTopics.length} weak topics, generating AI lesson...`
-      );
-
-      // Generate comprehensive remedial lessons using AI
-      const prompt = `You are an expert educational content creator. Based on the following analysis of a student's quiz performance in ${
-        subject.subjectName
-      }, create personalized remedial lesson plans to help them improve in their weak areas.
-
-STUDENT PERFORMANCE ANALYSIS:
-Subject: ${subject.subjectName}
-Total Topics in Subject: ${topics.length}
-Topics Attempted: ${attemptedTopics.length}
-Weak Topics Identified: ${weakTopics.length}
-
-WEAK AREAS REQUIRING ATTENTION:
-${weakTopics
-  .map(
-    topic => `
-Topic: ${topic.title}
-Description: ${topic.description}
-Difficulty Level: ${topic.difficulty}
-Average Performance: ${topic.averagePerformance}% (${topic.quizAttempts} attempts)
-Current Content Available:
-${topic.lessonContent}
-
----
-`
-  )
-  .join('')}
-
-${
-  unattemptedTopics.length > 0
-    ? `
-TOPICS NOT YET ATTEMPTED:
-${unattemptedTopics
-  .map(
-    topic =>
-      `- ${topic.title} (${topic.difficulty} difficulty): ${topic.description}`
-  )
-  .join('\n')}
-`
-    : ''
-}
-
-CONTEXT FOR BETTER LESSON DESIGN:
-Subject Overview: ${
-        subject.subjectName
-      } - This appears to be an academic subject requiring structured learning approach.
-
-Please generate a comprehensive remedial lesson plan that includes:
-
-1. **Priority Learning Path**: Order the weak topics by recommended study sequence
-2. **Targeted Lesson Content**: For each weak topic, provide:
-   - Key concepts simplified and explained clearly
-   - Common misconceptions and how to avoid them
-   - Step-by-step examples with solutions
-   - Practice exercises (3-5 questions with increasing difficulty)
-   - Memory techniques or mnemonics where applicable
-3. **Study Strategy**: Specific recommendations for this student based on their performance patterns
-4. **Progress Milestones**: Clear checkpoints to measure improvement
-5. **Additional Resources**: Suggested supplementary materials or study techniques
-
-Format your response as structured, actionable content that directly addresses the student's weak areas while building confidence. Make the content engaging and easy to follow, with clear headings and bullet points.`;
-
-      console.log('Generating AI-powered remedial lessons...');
-
-      const genAI = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY!,
-      });
-
-      const result = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      const aiGeneratedContent = result.text;
-
-      console.log('AI content generated successfully');
-
-      // Generate a unique ID for this weak lesson
-      const weakLessonId = uuidv4();
-
-      // Save the weak lesson to database
-      const savedWeakLesson = await db
-        .insert(weakLessonsTable)
-        .values({
-          weakLessonId: weakLessonId,
-          userId: userId,
-          subjectId: subjectId,
-          lessonContent: JSON.stringify({
-            analysis: {
-              totalTopics: topics.length,
-              attemptedTopics: attemptedTopics.length,
-              weakTopicsCount: weakTopics.length,
-              weakTopicIds: weakTopics.map(t => t.topicId),
-              averageOverallPerformance: Math.round(
-                attemptedTopics.reduce(
-                  (sum, topic) => sum + topic.averagePerformance,
-                  0
-                ) / (attemptedTopics.length || 1)
-              ),
-              analysisDate: new Date().toISOString(),
-              unattemptedTopicsCount: unattemptedTopics.length,
-              unattemptedTopicIds: unattemptedTopics.map(t => t.topicId),
-            },
-            remedialContent: aiGeneratedContent,
-            weakTopics: weakTopics,
-            attemptedTopics: attemptedTopics,
-            unattemptedTopics: unattemptedTopics,
-          }),
-        })
-        .returning();
-
-      console.log(
-        'Weak lesson saved to database with ID:',
-        savedWeakLesson[0]?.weakLessonId
-      );
-
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            lessonId: savedWeakLesson[0]?.weakLessonId,
-            subject: {
-              id: subject.subjectId,
-              name: subject.subjectName,
-            },
-            analysis: {
-              totalTopics: topics.length,
-              attemptedTopics: attemptedTopics.length,
-              weakTopics: weakTopics.length,
-              unattemptedTopics: unattemptedTopics.length,
-              averageOverallPerformance: Math.round(
-                attemptedTopics.reduce(
-                  (sum, topic) => sum + topic.averagePerformance,
-                  0
-                ) / (attemptedTopics.length || 1)
-              ),
-            },
-            attemptedTopics,
-            unattemptedTopics,
-            weakTopics,
-            remedialContent: aiGeneratedContent,
-            generatedAt: new Date().toISOString(),
-          },
-          'Remedial lesson plan generated successfully based on quiz performance'
-        )
-      );
-    } catch (error) {
-      console.error('Error generating weak lessons:', error);
-      return res
-        .status(500)
-        .json(new ApiResponse(500, null, 'Internal server error'));
-    }
-  }
-);
-
-export const getUserWeakLessons = asyncHandler(
-  async (req: Request, res: Response) => {
-    try {
-      const { subjectId } = req.params;
-      const userId = req.user.userId;
-
-      // Build where condition
-      let whereCondition;
-      if (subjectId && subjectId !== 'all') {
-        whereCondition = and(
-          eq(weakLessonsTable.userId, userId),
-          eq(weakLessonsTable.subjectId, subjectId)
-        );
-      } else {
-        whereCondition = eq(weakLessonsTable.userId, userId);
-      }
-
-      // Get user's weak lessons
-      const weakLessons = await db
-        .select({
-          weakLessonId: weakLessonsTable.weakLessonId,
-          userId: weakLessonsTable.userId,
-          subjectId: weakLessonsTable.subjectId,
-          lessonContent: weakLessonsTable.lessonContent,
-          createdAt: weakLessonsTable.createdAt,
-          updatedAt: weakLessonsTable.updatedAt,
-          subjectName: subjectsTable.subjectName,
-        })
-        .from(weakLessonsTable)
-        .innerJoin(
-          subjectsTable,
-          eq(weakLessonsTable.subjectId, subjectsTable.subjectId)
-        )
-        .where(whereCondition)
-        .orderBy(weakLessonsTable.createdAt);
-
-      // Parse lesson content for better presentation
-      const formattedLessons = weakLessons.map(lesson => ({
-        id: lesson.weakLessonId,
-        userId: lesson.userId,
-        subject: {
-          id: lesson.subjectId,
-          name: lesson.subjectName,
-        },
-        content: lesson.lessonContent ? JSON.parse(lesson.lessonContent) : null,
-        createdAt: lesson.createdAt,
-        updatedAt: lesson.updatedAt,
-      }));
-
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            lessons: formattedLessons,
-            total: formattedLessons.length,
-          },
-          'User weak lessons retrieved successfully'
-        )
-      );
-    } catch (error) {
-      console.error('Error retrieving user weak lessons:', error);
-      return res
-        .status(500)
-        .json(new ApiResponse(500, null, 'Internal server error'));
-    }
-  }
-);
-
-export const regenerateLatestWeakLessons = asyncHandler(
-  async (req: Request, res: Response) => {
-    try {
-      const { subjectId } = req.params;
-      const userId = req.user.userId;
-
-      // Validate subjectId
-      if (!subjectId || subjectId.trim() === '') {
-        return res
-          .status(400)
-          .json(new ApiResponse(400, {}, 'Subject ID is required'));
-      }
-
-      console.log(
-        `Regenerating latest weak lessons for user ${userId}, subject ${subjectId}`
-      );
-
-      // Verify subject exists
-      const subjectData = await db
-        .select()
-        .from(subjectsTable)
-        .where(eq(subjectsTable.subjectId, subjectId))
-        .limit(1);
-
-      if (subjectData.length === 0) {
-        return res
-          .status(404)
-          .json(new ApiResponse(404, {}, 'Subject not found'));
-      }
-
-      const subject = subjectData[0];
-
-      // Get all topics for this subject
-      const topics = await db
-        .select()
-        .from(topicsTable)
-        .where(eq(topicsTable.subjectId, subjectId));
-
-      if (topics.length === 0) {
-        return res
-          .status(404)
-          .json(new ApiResponse(404, {}, 'No topics found for this subject'));
-      }
-
-      console.log(
-        `Found ${topics.length} topics for subject: ${subject.subjectName}`
-      );
-
-      // Get ONLY the latest quiz attempt for each topic by this user for this subject
-      const latestQuizAttempts = await db
-        .select({
-          resultId: quizResultsTable.resultId,
-          score: quizResultsTable.score,
-          totalMarks: quizResultsTable.totalMarks,
-          completedAt: quizResultsTable.completedAt,
-          quizId: quizzesTable.quizId,
-          topicId: quizzesTable.topicId,
-          topicTitle: topicsTable.title,
-          topicDescription: topicsTable.description,
-          difficulty: topicsTable.difficulty,
-          rowNumber: quizResultsTable.resultId, // We'll use this for ranking
-        })
-        .from(quizResultsTable)
-        .innerJoin(
-          quizzesTable,
-          eq(quizResultsTable.quizId, quizzesTable.quizId)
-        )
-        .innerJoin(topicsTable, eq(quizzesTable.topicId, topicsTable.topicId))
-        .where(
-          and(
-            eq(quizzesTable.userId, userId),
-            eq(quizzesTable.subjectId, subjectId)
-          )
-        )
-        .orderBy(quizResultsTable.completedAt); // Order by completion time
-
-      console.log(
-        `Found ${latestQuizAttempts.length} total quiz attempts by user for this subject`
-      );
-
-      if (latestQuizAttempts.length === 0) {
-        // Get all topics info for context even if no quizzes attempted
-        const allTopicsInfo = topics.map(topic => ({
-          topicId: topic.topicId,
-          title: topic.title,
-          description: topic.description || 'No description available',
-          difficulty: topic.difficulty,
-          hasAttempts: false,
-        }));
-
+      if (quizAnalysisData.length === 0) {
         return res.status(200).json(
           new ApiResponse(
             200,
@@ -572,218 +345,126 @@ export const regenerateLatestWeakLessons = asyncHandler(
                 totalTopics: topics.length,
                 attemptedTopics: 0,
                 weakTopics: 0,
-                message:
-                  'No quiz attempts found for this subject. Please complete some quizzes first to identify current weak areas.',
+                message: 'No completed quizzes found for analysis.',
               },
-              topics: allTopicsInfo,
               weakTopics: [],
-              isRegenerated: true,
             },
-            'No recent quiz attempts found for analysis'
-          )
-        );
-      }
-
-      // Filter to get only the LATEST attempt for each topic
-      const latestAttemptsByTopic = new Map();
-
-      latestQuizAttempts.forEach(attempt => {
-        const topicId = attempt.topicId;
-        if (
-          !latestAttemptsByTopic.has(topicId) ||
-          new Date(attempt.completedAt) >
-            new Date(latestAttemptsByTopic.get(topicId).completedAt)
-        ) {
-          latestAttemptsByTopic.set(topicId, attempt);
-        }
-      });
-
-      console.log(
-        `Analyzing latest attempts for ${latestAttemptsByTopic.size} topics`
-      );
-
-      // Analyze performance of latest attempts only
-      const weakTopics = [];
-      const attemptedTopics = [];
-      const poorPerformanceThreshold = 95; // Below 60% is considered poor
-
-      for (const [topicId, latestAttempt] of latestAttemptsByTopic.entries()) {
-        const performancePercentage =
-          latestAttempt.totalMarks > 0
-            ? (latestAttempt.score / latestAttempt.totalMarks) * 100
-            : 0;
-
-        console.log(
-          `Topic ${latestAttempt.topicTitle}: ${performancePercentage.toFixed(
-            1
-          )}% (Latest attempt on ${new Date(
-            latestAttempt.completedAt
-          ).toLocaleDateString()})`
-        );
-
-        attemptedTopics.push({
-          topicId: latestAttempt.topicId,
-          title: latestAttempt.topicTitle,
-          description: latestAttempt.topicDescription,
-          difficulty: latestAttempt.difficulty,
-          latestPerformance: Math.round(performancePercentage),
-          lastAttemptDate: latestAttempt.completedAt,
-          isCurrentlyWeak: performancePercentage < poorPerformanceThreshold,
-        });
-
-        if (performancePercentage < poorPerformanceThreshold) {
-          // Get lesson content for this currently weak topic
-          const lessons = await db
-            .select()
-            .from(lessonsTable)
-            .where(eq(lessonsTable.topicId, latestAttempt.topicId));
-
-          const lessonContent =
-            lessons.length > 0
-              ? lessons.map(lesson => lesson.content).join('\n\n')
-              : `Topic: ${latestAttempt.topicTitle}\nDescription: ${latestAttempt.topicDescription}\nDifficulty: ${latestAttempt.difficulty}\n\nNo detailed lesson content available. This topic requires further study based on recent performance.`;
-
-          weakTopics.push({
-            topicId: latestAttempt.topicId,
-            title: latestAttempt.topicTitle,
-            description:
-              latestAttempt.topicDescription || 'No description available',
-            difficulty: latestAttempt.difficulty,
-            latestPerformance: Math.round(performancePercentage),
-            lastAttemptDate: latestAttempt.completedAt,
-            lessonContent: lessonContent,
-            isCurrentWeakness: true,
-          });
-        }
-      }
-
-      // Topics that haven't been attempted recently
-      const unattemptedTopics = topics
-        .filter(topic => !latestAttemptsByTopic.has(topic.topicId))
-        .map(topic => ({
-          topicId: topic.topicId,
-          title: topic.title,
-          description: topic.description || 'No description available',
-          difficulty: topic.difficulty,
-          status: 'not_attempted_recently',
-        }));
-
-      if (weakTopics.length === 0) {
-        return res.status(200).json(
-          new ApiResponse(
-            200,
-            {
-              subject: {
-                id: subject.subjectId,
-                name: subject.subjectName,
-              },
-              analysis: {
-                totalTopics: topics.length,
-                recentlyAttemptedTopics: attemptedTopics.length,
-                currentWeakTopics: 0,
-                unattemptedTopics: unattemptedTopics.length,
-                averageRecentPerformance: Math.round(
-                  attemptedTopics.reduce(
-                    (sum, topic) => sum + topic.latestPerformance,
-                    0
-                  ) / (attemptedTopics.length || 1)
-                ),
-              },
-              attemptedTopics,
-              unattemptedTopics,
-              weakTopics: [],
-              message:
-                'Excellent! No current weak areas identified based on latest quiz performance.',
-              isRegenerated: true,
-            },
-            'No current weak topics found based on recent quiz performance'
+            'No completed quizzes found for analysis'
           )
         );
       }
 
       console.log(
-        `Found ${weakTopics.length} currently weak topics based on latest attempts, generating updated AI lesson...`
+        `Sending ${quizAnalysisData.length} quiz analyses to LLM for weakness detection...`
       );
 
-      // Generate comprehensive remedial lessons using AI based on LATEST performance
-      const prompt = `You are an expert educational content creator. Based on the following analysis of a student's LATEST quiz performance in ${
-        subject.subjectName
-      }, create updated personalized remedial lesson plans to help them improve their CURRENT weak areas.
+      // Generate LLM prompt with quiz analysis data
+      const prompt = `You are an expert educational analyst. Analyze the student's quiz performance data and identify weak areas that need remedial study.
 
-IMPORTANT: This analysis focuses on the student's MOST RECENT performance per topic to identify their CURRENT weaknesses.
+SUBJECT: ${subject.subjectName}
+TOTAL TOPICS AVAILABLE: ${topics.length}
+TOPICS ATTEMPTED: ${quizAnalysisData.length}
 
-CURRENT STUDENT PERFORMANCE ANALYSIS:
-Subject: ${subject.subjectName}
-Total Topics in Subject: ${topics.length}
-Recently Attempted Topics: ${attemptedTopics.length}
-Current Weak Topics (Latest Performance): ${weakTopics.length}
-
-CURRENT WEAK AREAS REQUIRING IMMEDIATE ATTENTION:
-${weakTopics
+DETAILED QUIZ ANALYSIS:
+${quizAnalysisData
   .map(
-    topic => `
-Topic: ${topic.title}
-Description: ${topic.description}
-Difficulty Level: ${topic.difficulty}
-Latest Performance: ${topic.latestPerformance}% (Last attempt: ${new Date(
-      topic.lastAttemptDate
-    ).toLocaleDateString()})
-Current Status: NEEDS IMPROVEMENT
-Available Content:
-${topic.lessonContent}
+    (quiz, index) => `
+=== Quiz ${index + 1}: ${quiz.topicTitle} ===
+Topic Description: ${quiz.topicDescription || 'No description available'}
+Topic Difficulty: ${quiz.topicDifficulty}
+Overall Performance: ${quiz.correctAnswers}/${quiz.totalQuestions} = ${
+      quiz.percentage
+    }%
+Completed: ${
+      quiz.completedAt
+        ? new Date(quiz.completedAt).toLocaleDateString()
+        : 'Unknown date'
+    }
 
+QUESTION-BY-QUESTION ANALYSIS:
+${quiz.questions
+  .map(
+    (q, qIndex) => `
+Question ${qIndex + 1}: ${q.question}
+A) ${q.optionA}
+B) ${q.optionB}
+C) ${q.optionC}
+D) ${q.optionD}
+Correct Answer: ${q.correctAnswer}
+User Answer: ${q.userChoice}
+Result: ${q.isCorrect ? '✅ CORRECT' : '❌ WRONG'}
+Difficulty: ${q.difficulty}
+`
+  )
+  .join('')}
 ---
 `
   )
   .join('')}
 
-${
-  unattemptedTopics.length > 0
-    ? `
-TOPICS NOT RECENTLY ATTEMPTED:
-${unattemptedTopics
-  .map(
-    topic =>
-      `- ${topic.title} (${topic.difficulty} difficulty): ${topic.description}`
+UNATTEMPTED TOPICS:
+${topics
+  .filter(
+    topic => !quizAnalysisData.some(quiz => quiz.topicId === topic.topicId)
   )
-  .join('\n')}
+  .map(
+    topic => `
+- ${topic.title}: ${topic.description || 'No description'} (Difficulty: ${
+      topic.difficulty
+    })
 `
-    : ''
+  )
+  .join('')}
+
+ANALYSIS INSTRUCTIONS:
+1. Identify topics where the student performed poorly (< 60% correct)
+2. Look for patterns in wrong answers to identify conceptual gaps
+3. Consider question difficulty levels when assessing performance
+4. For each weak area identified, provide specific remedial recommendations
+5. If performance is good across all topics (≥75% average), indicate no major weaknesses found
+
+REQUIRED OUTPUT FORMAT:
+{
+  "analysis": {
+    "totalTopics": ${topics.length},
+    "attemptedTopics": ${quizAnalysisData.length},
+    "averageOverallPerformance": [calculate average percentage across all quizzes],
+    "performanceSummary": "[brief summary of student's performance]"
+  },
+  "weakTopics": [
+    {
+      "topicId": "topic_id",
+      "title": "Topic Name",
+      "description": "Topic description",
+      "difficulty": "Easy/Medium/Hard",
+      "averagePerformance": [percentage score],
+      "problemAreas": "[specific areas where student struggled]",
+      "remedialRecommendations": "[specific study recommendations]"
+    }
+  ],
+  "attemptedTopics": [
+    {
+      "topicId": "topic_id",
+      "title": "Topic Name",
+      "performance": [percentage],
+      "isWeak": [true/false]
+    }
+  ],
+  "unattemptedTopics": [
+    {
+      "topicId": "topic_id",
+      "title": "Topic Name",
+      "difficulty": "Easy/Medium/Hard",
+      "status": "not_attempted"
+    }
+  ]
 }
 
-RECENT PERFORMANCE CONTEXT:
-${attemptedTopics
-  .filter(topic => !topic.isCurrentlyWeak)
-  .map(
-    topic => `✓ ${topic.title}: ${topic.latestPerformance}% (Good performance)`
-  )
-  .join('\n')}
+Return ONLY the JSON response, no additional text.`;
 
-CONTEXT FOR UPDATED LESSON DESIGN:
-Subject Overview: ${
-        subject.subjectName
-      } - Updated analysis based on most recent quiz attempts
-Focus: Address CURRENT weaknesses and maintain strong areas
+      console.log('Sending analysis request to LLM...');
 
-Please generate an UPDATED comprehensive remedial lesson plan that includes:
-
-1. **Current Priority Learning Path**: Order the currently weak topics by urgency based on recent performance
-2. **Updated Targeted Lesson Content**: For each currently weak topic, provide:
-   - Key concepts that need immediate attention
-   - Recent common mistakes and how to avoid them
-   - Updated step-by-step examples with solutions
-   - Fresh practice exercises (3-5 questions with increasing difficulty)
-   - New memory techniques or reinforcement strategies
-3. **Current Study Strategy**: Updated recommendations based on latest performance patterns
-4. **Immediate Progress Milestones**: Clear short-term checkpoints to address current weaknesses
-5. **Updated Resources**: Fresh supplementary materials or updated study techniques
-
-Format your response as structured, actionable content that directly addresses the student's CURRENT weak areas while acknowledging their recent progress. Make the content engaging and focused on immediate improvement needs.`;
-
-      console.log(
-        'Generating updated AI-powered remedial lessons based on latest performance...'
-      );
-
+      // Send to LLM for analysis
       const genAI = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY!,
       });
@@ -792,84 +473,420 @@ Format your response as structured, actionable content that directly addresses t
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
-      const aiGeneratedContent = result.text;
+      const analysisText = result.text;
 
-      console.log('Updated AI content generated successfully');
+      console.log('Received LLM analysis response');
 
-      // Generate a unique ID for this regenerated weak lesson
-      const weakLessonId = uuidv4();
-
-      // Save the regenerated weak lesson to database
-      const savedWeakLesson = await db
-        .insert(weakLessonsTable)
-        .values({
-          weakLessonId: weakLessonId,
-          userId: userId,
-          subjectId: subjectId,
-          lessonContent: JSON.stringify({
-            analysis: {
-              type: 'latest_performance_analysis',
-              totalTopics: topics.length,
-              recentlyAttemptedTopics: attemptedTopics.length,
-              currentWeakTopicsCount: weakTopics.length,
-              currentWeakTopicIds: weakTopics.map(t => t.topicId),
-              averageRecentPerformance: Math.round(
-                attemptedTopics.reduce(
-                  (sum, topic) => sum + topic.latestPerformance,
-                  0
-                ) / (attemptedTopics.length || 1)
-              ),
-              analysisDate: new Date().toISOString(),
-              unattemptedTopicsCount: unattemptedTopics.length,
-              unattemptedTopicIds: unattemptedTopics.map(t => t.topicId),
-              regenerated: true,
-            },
-            remedialContent: aiGeneratedContent,
-            currentWeakTopics: weakTopics,
-            recentAttemptedTopics: attemptedTopics,
-            unattemptedTopics: unattemptedTopics,
-          }),
-        })
-        .returning();
+      let analysisData;
+      try {
+        // Clean the response and parse JSON
+        const cleanedResponse = (analysisText || '')
+          .replace(/```json|```/g, '')
+          .trim();
+        analysisData = JSON.parse(cleanedResponse);
+      } catch (parseError) {
+        console.error('Error parsing LLM response:', parseError);
+        console.log('Raw LLM response:', analysisText);
+        throw new Error('Failed to parse weakness analysis from LLM');
+      }
 
       console.log(
-        'Regenerated weak lesson saved to database with ID:',
-        savedWeakLesson[0]?.weakLessonId
+        `LLM identified ${analysisData.weakTopics?.length || 0} weak topics`
       );
 
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            lessonId: savedWeakLesson[0]?.weakLessonId,
-            subject: {
-              id: subject.subjectId,
-              name: subject.subjectName,
-            },
-            analysis: {
-              type: 'latest_performance_analysis',
-              totalTopics: topics.length,
-              recentlyAttemptedTopics: attemptedTopics.length,
-              currentWeakTopics: weakTopics.length,
-              unattemptedTopics: unattemptedTopics.length,
-              averageRecentPerformance: Math.round(
-                attemptedTopics.reduce(
-                  (sum, topic) => sum + topic.latestPerformance,
+      // Generate detailed remedial lessons for weak topics
+      let detailedRemedialLessons = [];
+      if (analysisData.weakTopics?.length > 0) {
+        console.log('Generating detailed remedial lessons for weak topics...');
+
+        for (const weakTopic of analysisData.weakTopics) {
+          console.log(`Generating remedial content for: ${weakTopic.title}`);
+
+          // Extract user mistakes for this topic
+          const topicQuizData = quizAnalysisData.filter(
+            quiz => quiz.topicId === weakTopic.topicId
+          );
+          const userMistakes = topicQuizData.flatMap(quiz =>
+            quiz.questions
+              .filter(q => !q.isCorrect)
+              .map(
+                q =>
+                  `Question: ${q.question.substring(0, 100)}... | User chose: ${
+                    q.userChoice
+                  } | Correct: ${q.correctAnswer}`
+              )
+          );
+
+          const remedialPrompt = `You are an expert educational content creator. Generate a comprehensive remedial study plan for a student who is struggling with this topic.
+
+SUBJECT: ${subject.subjectName}
+WEAK TOPIC: ${weakTopic.title}
+DESCRIPTION: ${weakTopic.description || 'No description available'}
+DIFFICULTY LEVEL: ${weakTopic.difficulty}
+STUDENT'S PERFORMANCE: ${weakTopic.averagePerformance}%
+PROBLEM AREAS: ${weakTopic.problemAreas}
+CURRENT RECOMMENDATIONS: ${weakTopic.remedialRecommendations}
+
+STUDENT'S SPECIFIC MISTAKES FROM QUIZ ANALYSIS:
+${userMistakes.join('\n')}
+
+Generate a detailed remedial lesson that includes:
+
+1. **Concept Review**: Break down the core concepts the student needs to understand
+2. **Step-by-Step Learning Path**: Ordered steps to master this topic
+3. **Practice Exercises**: Specific types of questions/problems to practice
+4. **Common Mistakes to Avoid**: Based on the student's quiz errors
+5. **Study Resources**: Suggested resources, videos, or materials
+6. **Self-Assessment Questions**: Questions to test understanding
+7. **Time Allocation**: Recommended study time distribution
+
+REQUIRED OUTPUT FORMAT:
+{
+  "topicId": "${weakTopic.topicId}",
+  "title": "${weakTopic.title}",
+  "difficulty": "${weakTopic.difficulty}",
+  "performance": ${weakTopic.averagePerformance},
+  "conceptReview": {
+    "coreConceptsToReview": ["concept1", "concept2", "concept3"],
+    "fundamentalPrinciples": "Detailed explanation of fundamental principles",
+    "keyTermsAndDefinitions": [
+      {"term": "term1", "definition": "definition1"},
+      {"term": "term2", "definition": "definition2"}
+    ]
+  },
+  "learningPath": {
+    "step1": {"title": "Step Title", "description": "What to do", "timeRequired": "30 minutes"},
+    "step2": {"title": "Step Title", "description": "What to do", "timeRequired": "45 minutes"},
+    "step3": {"title": "Step Title", "description": "What to do", "timeRequired": "60 minutes"}
+  },
+  "practiceExercises": {
+    "basicLevel": ["exercise1", "exercise2", "exercise3"],
+    "intermediateLevel": ["exercise1", "exercise2"],
+    "advancedLevel": ["exercise1", "exercise2"]
+  },
+  "commonMistakes": [
+    {"mistake": "Common mistake description", "correction": "How to avoid/correct it"},
+    {"mistake": "Another mistake", "correction": "Correction approach"}
+  ],
+  "studyResources": {
+    "recommendedReadings": ["resource1", "resource2"],
+    "videoLessons": ["video topic 1", "video topic 2"],
+    "onlinePractice": ["practice site/method 1", "practice site/method 2"]
+  },
+  "selfAssessment": [
+    {"question": "Assessment question 1", "expectedAnswer": "What they should know"},
+    {"question": "Assessment question 2", "expectedAnswer": "What they should know"}
+  ],
+  "timeAllocation": {
+    "totalRecommendedTime": "4-6 hours over 1 week",
+    "dailyStudyTime": "30-45 minutes per day",
+    "breakdown": {
+      "conceptReview": "1-2 hours",
+      "practiceExercises": "2-3 hours",
+      "selfAssessment": "1 hour"
+    }
+  }
+}
+
+Return ONLY the JSON response, no additional text.`;
+
+          try {
+            const remedialResult = await genAI.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: remedialPrompt,
+            });
+
+            const remedialText = remedialResult.text;
+            const cleanedRemedialResponse = (remedialText || '')
+              .replace(/```json|```/g, '')
+              .trim();
+            const remedialLesson = JSON.parse(cleanedRemedialResponse);
+
+            // Generate additional practice questions
+            console.log(
+              `Generating practice questions for: ${weakTopic.title}`
+            );
+            const practiceQuestions = await generatePracticeQuestions(
+              genAI,
+              weakTopic,
+              subject.subjectName,
+              userMistakes
+            );
+
+            // Combine remedial lesson with practice questions
+            const completeLesson = {
+              ...remedialLesson,
+              additionalPracticeQuestions:
+                practiceQuestions.practiceQuestions || [],
+              mistakeAnalysis:
+                userMistakes.length > 0
+                  ? {
+                      totalMistakes: userMistakes.length,
+                      commonErrorPatterns: userMistakes.slice(0, 3), // Show top 3 mistakes
+                      improvementFocus: `Focus on understanding ${weakTopic.problemAreas}`,
+                    }
+                  : null,
+            };
+
+            detailedRemedialLessons.push(completeLesson);
+            console.log(
+              `Generated complete remedial lesson for: ${weakTopic.title}`
+            );
+          } catch (error) {
+            console.error(
+              `Error generating remedial lesson for ${weakTopic.title}:`,
+              error
+            );
+            // Add a basic fallback lesson
+            detailedRemedialLessons.push({
+              topicId: weakTopic.topicId,
+              title: weakTopic.title,
+              difficulty: weakTopic.difficulty,
+              performance: weakTopic.averagePerformance,
+              error: 'Failed to generate detailed remedial lesson',
+              basicRecommendations: weakTopic.remedialRecommendations,
+            });
+          }
+        }
+
+        console.log(`\n=== REMEDIAL LESSON GENERATION SUMMARY ===`);
+        console.log(
+          `Total weak topics identified: ${
+            analysisData.weakTopics?.length || 0
+          }`
+        );
+        console.log(
+          `Detailed lessons generated: ${detailedRemedialLessons.length}`
+        );
+        console.log(
+          `Total practice questions created: ${detailedRemedialLessons.reduce(
+            (total, lesson) =>
+              total + (lesson.additionalPracticeQuestions?.length || 0),
+            0
+          )}`
+        );
+        console.log(
+          `Average study time required: ${detailedRemedialLessons.length * 4}-${
+            detailedRemedialLessons.length * 6
+          } hours`
+        );
+        console.log(`==========================================\n`);
+      }
+
+      // Generate personalized study schedule
+      let personalizedSchedule = null;
+      if (detailedRemedialLessons.length > 0) {
+        console.log('Generating personalized study schedule...');
+        personalizedSchedule = await generateStudySchedule(
+          genAI,
+          analysisData.weakTopics,
+          `${detailedRemedialLessons.length * 4}-${
+            detailedRemedialLessons.length * 6
+          } hours`,
+          subject.subjectName
+        );
+
+        if (personalizedSchedule) {
+          console.log('Study schedule generated successfully');
+        }
+      }
+
+      // Create the lesson record in database
+      const lessonId = uuidv4();
+      const currentTime = new Date();
+
+      const weakLessonData = {
+        lessonId,
+        userId,
+        subject: {
+          id: subject.subjectId,
+          name: subject.subjectName,
+        },
+        analysis: analysisData.analysis,
+        weakTopics: analysisData.weakTopics || [],
+        attemptedTopics: analysisData.attemptedTopics || [],
+        unattemptedTopics: analysisData.unattemptedTopics || [],
+        detailedRemedialLessons: detailedRemedialLessons,
+        personalizedStudySchedule: personalizedSchedule,
+        remedialSummary: {
+          totalWeakTopics: analysisData.weakTopics?.length || 0,
+          detailedLessonsGenerated: detailedRemedialLessons.length,
+          totalPracticeQuestions: detailedRemedialLessons.reduce(
+            (total, lesson) =>
+              total + (lesson.additionalPracticeQuestions?.length || 0),
+            0
+          ),
+          averageStudyTimeRequired:
+            detailedRemedialLessons.length > 0
+              ? `${detailedRemedialLessons.length * 4}-${
+                  detailedRemedialLessons.length * 6
+                } hours total`
+              : 'No study time needed',
+          message:
+            detailedRemedialLessons.length > 0
+              ? `Generated ${detailedRemedialLessons.length} comprehensive remedial lessons with step-by-step learning paths, practice exercises, and personalized study resources.`
+              : 'No detailed remedial lessons needed.',
+        },
+        remedialContent:
+          analysisData.weakTopics?.length > 0
+            ? `Based on your quiz performance analysis, here are the areas that need improvement:\n\n${analysisData.weakTopics
+                .map(
+                  (topic: any, index: number) =>
+                    `${index + 1}. **${topic.title}** (${
+                      topic.averagePerformance
+                    }% average)\n   - Problem Areas: ${
+                      topic.problemAreas
+                    }\n   - Recommendations: ${topic.remedialRecommendations}\n`
+                )
+                .join('\n')}`
+            : 'Excellent performance! No significant weaknesses detected in your quiz attempts.',
+        generatedAt: currentTime.toISOString(),
+      };
+
+      // Save to database
+      await db.insert(weakLessonsTable).values({
+        weakLessonId: lessonId,
+        userId: userId,
+        subjectId: subjectId,
+        lessonContent: JSON.stringify(weakLessonData),
+        createdAt: currentTime,
+        updatedAt: currentTime,
+      });
+
+      console.log('Weakness analysis saved to database');
+
+      return res
+        .status(201)
+        .json(
+          new ApiResponse(
+            201,
+            weakLessonData,
+            analysisData.weakTopics?.length > 0
+              ? `Comprehensive weakness analysis complete! Found ${
+                  analysisData.weakTopics.length
+                } areas needing improvement with ${
+                  detailedRemedialLessons.length
+                } detailed remedial lessons and ${detailedRemedialLessons.reduce(
+                  (total, lesson) =>
+                    total + (lesson.additionalPracticeQuestions?.length || 0),
                   0
-                ) / (attemptedTopics.length || 1)
-              ),
-              regenerated: true,
-            },
-            recentAttemptedTopics: attemptedTopics,
-            unattemptedTopics,
-            currentWeakTopics: weakTopics,
-            remedialContent: aiGeneratedContent,
-            generatedAt: new Date().toISOString(),
-            isRegenerated: true,
-          },
-          'Updated remedial lesson plan generated successfully based on latest quiz performance'
-        )
+                )} personalized practice questions.`
+              : 'Analysis complete! No significant weaknesses detected based on your quiz performance.'
+          )
+        );
+    } catch (error) {
+      console.error('Error generating weak lessons:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+export const getUserWeakLessons = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { subjectId } = req.params;
+      const userId = req.user.userId;
+
+      console.log(
+        `Getting weak lessons for user ${userId}, subject ${subjectId}`
       );
+
+      let whereConditions;
+      if (subjectId === 'all') {
+        whereConditions = eq(weakLessonsTable.userId, userId);
+      } else {
+        whereConditions = and(
+          eq(weakLessonsTable.userId, userId),
+          eq(weakLessonsTable.subjectId, subjectId)
+        );
+      }
+
+      const weakLessons = await db
+        .select({
+          weakLessonId: weakLessonsTable.weakLessonId,
+          lessonContent: weakLessonsTable.lessonContent,
+          createdAt: weakLessonsTable.createdAt,
+          updatedAt: weakLessonsTable.updatedAt,
+          subjectName: subjectsTable.subjectName,
+        })
+        .from(weakLessonsTable)
+        .innerJoin(
+          subjectsTable,
+          eq(weakLessonsTable.subjectId, subjectsTable.subjectId)
+        )
+        .where(whereConditions);
+
+      if (weakLessons.length === 0) {
+        return res
+          .status(200)
+          .json(
+            new ApiResponse(
+              200,
+              { lessons: [] },
+              subjectId === 'all'
+                ? 'No weak lessons found for any subject'
+                : 'No weak lessons found for this subject'
+            )
+          );
+      }
+
+      // Parse lesson content and format response
+      const formattedLessons = weakLessons.map(lesson => {
+        let parsedContent;
+        try {
+          parsedContent = JSON.parse(lesson.lessonContent);
+        } catch (error) {
+          console.error('Error parsing lesson content:', error);
+          parsedContent = { error: 'Failed to parse lesson content' };
+        }
+
+        return {
+          id: lesson.weakLessonId,
+          userId: userId,
+          subject: {
+            name: lesson.subjectName,
+          },
+          content: parsedContent,
+          createdAt: lesson.createdAt,
+          updatedAt: lesson.updatedAt,
+        };
+      });
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            { lessons: formattedLessons },
+            `Found ${formattedLessons.length} weak lesson(s)`
+          )
+        );
+    } catch (error) {
+      console.error('Error getting user weak lessons:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Internal server error'));
+    }
+  }
+);
+
+export const regenerateLatestWeakLessons = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { subjectId } = req.body;
+      const userId = req.user.userId;
+
+      console.log(
+        `Regenerating latest weak lessons for user ${userId}, subject ${subjectId}`
+      );
+
+      // This will follow similar logic to generateWeakLessons but focus on latest performance
+      // For now, let's just call the generate function
+      // You can enhance this later to focus on recent attempts only
+      req.params.subjectId = subjectId;
+      return await generateWeakLessons(req, res, next);
     } catch (error) {
       console.error('Error regenerating latest weak lessons:', error);
       return res

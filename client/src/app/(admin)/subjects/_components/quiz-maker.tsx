@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Axios } from "@/config/axios";
 import useAuthStore from "@/store/store";
 import {
+  BarChart3,
   Brain,
   CheckCircle2,
   Circle,
@@ -16,7 +17,9 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Trophy
+  Trash2,
+  Trophy,
+  X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -91,6 +94,9 @@ interface QuizState {
   existingQuizzes: any[];
   isLoadingQuizzes: boolean;
   lastWeakness?: string;
+  // Results viewer states
+  showResultsModal: boolean;
+  selectedQuizResults: any | null;
 }
 
 const difficultyColors = {
@@ -124,6 +130,8 @@ export function QuizMaker({
     showQuizList: true, // Start by showing quiz options
     existingQuizzes: [],
     isLoadingQuizzes: false,
+    showResultsModal: false,
+    selectedQuizResults: null,
   });
 
   // Auto-start quiz when data is available and user hasn't chosen to show quiz list
@@ -185,6 +193,81 @@ export function QuizMaker({
 
     setQuizState(prev => ({ ...prev, showQuizList: false }));
     await onLoadQuiz(quizId);
+  };
+
+  // Delete quiz function
+  const deleteQuiz = async (quizId: string, quizName: string) => {
+    if (!accessToken) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${quizName}"? This will permanently remove the quiz and all associated results.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      const response = await Axios.delete(`/api/topic/quiz/${quizId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        toast.success("Quiz deleted successfully!");
+        // Refresh the quiz list
+        await fetchExistingQuizzes();
+      } else {
+        toast.error("Failed to delete quiz");
+      }
+    } catch (error: any) {
+      console.error('Error deleting quiz:', error);
+      toast.error(error.response?.data?.message || "Failed to delete quiz");
+    }
+  };
+
+  // View quiz results function
+  const viewQuizResults = async (quizId: string, quizName: string) => {
+    if (!accessToken) return;
+
+    try {
+      const response = await Axios.get(`/api/topic/quiz/${quizId}/results`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.data.success) {
+        const { results, cognitiveAssessments, totalAttempts } = response.data.data;
+
+        setQuizState(prev => ({
+          ...prev,
+          showResultsModal: true,
+          selectedQuizResults: {
+            quizId,
+            quizName,
+            results,
+            cognitiveAssessments,
+            totalAttempts
+          }
+        }));
+
+        toast.success("Quiz results loaded!");
+      } else {
+        toast.error("Failed to load quiz results");
+      }
+    } catch (error: any) {
+      console.error('Error fetching quiz results:', error);
+      toast.error(error.response?.data?.message || "Failed to load quiz results");
+    }
+  };
+
+  // Close results modal
+  const closeResultsModal = () => {
+    setQuizState(prev => ({
+      ...prev,
+      showResultsModal: false,
+      selectedQuizResults: null
+    }));
   };
 
   // Timer effect
@@ -400,6 +483,8 @@ export function QuizMaker({
       existingQuizzes: quizState.existingQuizzes,
       isLoadingQuizzes: false,
       lastWeakness: quizState.lastWeakness,
+      showResultsModal: false,
+      selectedQuizResults: null,
     });
     if (onRetakeQuiz) onRetakeQuiz();
   };
@@ -488,7 +573,7 @@ export function QuizMaker({
                   <Card key={quiz.quizId} className="border-gray-200 hover:border-blue-300 transition-colors">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="flex-1">
                           <h4 className="font-medium text-gray-900 dark:text-gray-100">
                             Quiz #{index + 1}
                           </h4>
@@ -496,19 +581,51 @@ export function QuizMaker({
                             {quiz.questionCount || 0} questions • Created {new Date(quiz.createdAt).toLocaleDateString()}
                           </p>
                           {quiz.attemptCount > 0 && (
-                            <p className="text-xs text-blue-600">
-                              Attempted {quiz.attemptCount} time(s)
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-blue-600">
+                                Attempted {quiz.attemptCount} time(s)
+                              </p>
+                              <Badge variant="secondary" className="text-xs">
+                                {quiz.attemptCount > 1 ? 'Multiple Attempts' : 'Single Attempt'}
+                              </Badge>
+                            </div>
                           )}
                         </div>
-                        <Button
-                          onClick={() => loadExistingQuiz(quiz.quizId)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Play className="w-4 h-4 mr-1" />
-                          Take Quiz
-                        </Button>
+                        <div className="flex items-center gap-2 ml-4">
+                          {/* View Results Button - only show if there are attempts */}
+                          {quiz.attemptCount > 0 && (
+                            <Button
+                              onClick={() => viewQuizResults(quiz.quizId, `Quiz #${index + 1}`)}
+                              variant="outline"
+                              size="sm"
+                              className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300"
+                            >
+                              <BarChart3 className="w-4 h-4 mr-1" />
+                              Results
+                            </Button>
+                          )}
+
+                          {/* Take Quiz Button */}
+                          <Button
+                            onClick={() => loadExistingQuiz(quiz.quizId)}
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
+                          >
+                            <Play className="w-4 h-4 mr-1" />
+                            Take Quiz
+                          </Button>
+
+                          {/* Delete Button */}
+                          <Button
+                            onClick={() => deleteQuiz(quiz.quizId, `Quiz #${index + 1}`)}
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -522,6 +639,13 @@ export function QuizMaker({
             )}
           </CardContent>
         </Card>
+
+        {/* Results Modal */}
+        <ResultsModal
+          isOpen={quizState.showResultsModal}
+          onClose={closeResultsModal}
+          results={quizState.selectedQuizResults}
+        />
       </div>
     );
   }
@@ -793,6 +917,13 @@ export function QuizMaker({
             })}
           </CardContent>
         </Card> */}
+
+        {/* Results Modal */}
+        <ResultsModal
+          isOpen={quizState.showResultsModal}
+          onClose={closeResultsModal}
+          results={quizState.selectedQuizResults}
+        />
       </div>
     );
   }
@@ -855,6 +986,13 @@ export function QuizMaker({
             </Button>
           </CardContent>
         </Card>
+
+        {/* Results Modal */}
+        <ResultsModal
+          isOpen={quizState.showResultsModal}
+          onClose={closeResultsModal}
+          results={quizState.selectedQuizResults}
+        />
       </div>
     );
   }
@@ -970,6 +1108,110 @@ export function QuizMaker({
           </div>
         </CardContent>
       </Card>
+
+      {/* Results Modal */}
+      <ResultsModal
+        isOpen={quizState.showResultsModal}
+        onClose={closeResultsModal}
+        results={quizState.selectedQuizResults}
+      />
     </div>
   );
 }
+
+// Results Modal Component
+const ResultsModal = ({
+  isOpen,
+  onClose,
+  results
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  results: any | null;
+}) => {
+  if (!isOpen || !results) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {results.quizName} - Results
+            </h2>
+            <Button onClick={onClose} variant="ghost" size="sm">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Total Attempts: {results.totalAttempts}
+          </p>
+        </div>
+
+        <div className="p-6 max-h-[70vh] overflow-y-auto">
+          {results.results.length > 0 ? (
+            <div className="space-y-4">
+              {results.results.map((result: any, index: number) => (
+                <Card key={result.resultId} className="border-gray-200 dark:border-gray-700">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span>Attempt {index + 1}</span>
+                      <Badge
+                        className={
+                          Math.round((result.score/result.totalMarks)*100) >= 80
+                            ? "bg-green-100 text-green-800"
+                            : Math.round((result.score/result.totalMarks)*100) >= 60
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }
+                      >
+                        {Math.round((result.score/result.totalMarks)*100)}%
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {result.score}/{result.totalMarks}
+                        </div>
+                        <div className="text-sm text-blue-700 dark:text-blue-300">Score</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {Math.round(result.timeTaken/60)}m
+                        </div>
+                        <div className="text-sm text-green-700 dark:text-green-300">Time Taken</div>
+                      </div>
+                      <div className="text-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                        <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                          {new Date(result.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-purple-700 dark:text-purple-300">Date</div>
+                      </div>
+                    </div>
+                    {result.summary && (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                          AI Feedback:
+                        </h4>
+                        <div className="text-sm text-gray-700 dark:text-gray-300">
+                          <ReactMarkdown>{result.summary}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-gray-500">No attempts found for this quiz.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

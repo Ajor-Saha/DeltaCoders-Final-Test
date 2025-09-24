@@ -265,3 +265,120 @@ export const analyzeQuizMentalStatus = asyncHandler(
     }
   }
 );
+
+export const deleteQuiz = asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { quizId } = req.params;
+
+    if (!quizId) {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, null, 'Quiz ID is required'));
+    }
+
+    // Check if quiz exists
+    const existingQuiz = await db
+      .select()
+      .from(quizzesTable)
+      .where(eq(quizzesTable.quizId, quizId))
+      .limit(1);
+
+    if (!existingQuiz.length) {
+      return res.status(404).json(new ApiResponse(404, null, 'Quiz not found'));
+    }
+
+    // Start transaction to delete all related data
+    await db.transaction(async tx => {
+      // Delete cognitive assessments related to this quiz
+      await tx
+        .delete(cognitiveAssessmentsTable)
+        .where(eq(cognitiveAssessmentsTable.quizId, quizId));
+
+      // Delete quiz results
+      await tx
+        .delete(quizResultsTable)
+        .where(eq(quizResultsTable.quizId, quizId));
+
+      // Delete quiz questions
+      await tx
+        .delete(quizQuestionsTable)
+        .where(eq(quizQuestionsTable.quizId, quizId));
+
+      // Finally delete the quiz itself
+      await tx.delete(quizzesTable).where(eq(quizzesTable.quizId, quizId));
+    });
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          { deletedQuizId: quizId },
+          'Quiz and all related data deleted successfully'
+        )
+      );
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    return res
+      .status(500)
+      .json(new ApiResponse(500, null, 'Error deleting quiz'));
+  }
+});
+
+export const getQuizResults = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { quizId } = req.params;
+
+      if (!quizId) {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, null, 'Quiz ID is required'));
+      }
+
+      // Get quiz results with quiz details
+      const results = await db
+        .select({
+          resultId: quizResultsTable.resultId,
+          score: quizResultsTable.score,
+          totalMarks: quizResultsTable.totalMarks,
+          timeTaken: quizResultsTable.timeTaken,
+          summary: quizResultsTable.summary,
+          createdAt: quizResultsTable.createdAt,
+          quizId: quizzesTable.quizId,
+          topicId: quizzesTable.topicId,
+          subjectId: quizzesTable.subjectId,
+        })
+        .from(quizResultsTable)
+        .innerJoin(
+          quizzesTable,
+          eq(quizResultsTable.quizId, quizzesTable.quizId)
+        )
+        .where(eq(quizResultsTable.quizId, quizId))
+        .orderBy(sql`${quizResultsTable.createdAt} DESC`);
+
+      // Get cognitive assessments if available
+      const cognitiveAssessments = await db
+        .select()
+        .from(cognitiveAssessmentsTable)
+        .where(eq(cognitiveAssessmentsTable.quizId, quizId));
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            results,
+            cognitiveAssessments,
+            totalAttempts: results.length,
+          },
+          'Quiz results retrieved successfully'
+        )
+      );
+    } catch (error) {
+      console.error('Error getting quiz results:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, null, 'Error retrieving quiz results'));
+    }
+  }
+);

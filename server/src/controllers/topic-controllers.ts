@@ -1278,3 +1278,263 @@ export const getQuizById = asyncHandler(async (req: Request, res: Response) => {
     res.status(500).json(new ApiResponse(500, null, 'Internal server error'));
   }
 });
+
+export const generateTopicsBasedOnPreferences = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const { subjectId, user_preference } = req.body;
+      const userId = req.user.userId;
+
+      // Validation
+      if (!subjectId || subjectId.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'Subject ID is required'));
+      }
+
+      if (!user_preference || user_preference.trim() === '') {
+        return res
+          .status(400)
+          .json(new ApiResponse(400, {}, 'User preference is required'));
+      }
+
+      // Validate subject exists
+      const subjectData = await db
+        .select()
+        .from(subjectsTable)
+        .where(eq(subjectsTable.subjectId, subjectId))
+        .limit(1);
+
+      if (subjectData.length === 0) {
+        return res
+          .status(404)
+          .json(new ApiResponse(404, {}, 'Subject not found'));
+      }
+
+      const subject = subjectData[0];
+
+      // Get existing topics for this subject to understand current coverage
+      const existingTopics = await db
+        .select()
+        .from(topicsTable)
+        .where(eq(topicsTable.subjectId, subjectId));
+
+      console.log(
+        `AI Agent is analyzing subject: ${subject.subjectName} for personalized topic generation`
+      );
+
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+      });
+
+      // Determine topic count based on user preferences (2-4 topics)
+      let topicCount = 3; // Default
+
+      console.log(
+        `AI Agent is generating ${topicCount} personalized topics...`
+      );
+
+      // Generate topics prompt with comprehensive analysis
+      let topicPrompt = `You are an AI Agent Educational Topic Generator. You have analyzed the subject "${
+        subject.subjectName
+      }" and user requirements to generate personalized learning topics.
+
+**Subject Analysis Complete:** ${subject.subjectName}
+
+**Existing Topics Coverage:** ${
+        existingTopics.length > 0
+          ? existingTopics.map(t => `${t.title} (${t.difficulty})`).join(', ')
+          : 'No existing topics - fresh start'
+      }
+
+**User Learning Preferences:** ${user_preference}
+
+**AI Agent Instructions:**
+- Generate ${topicCount} high-quality, personalized topics
+- Each topic must be unique and not duplicate existing coverage
+- Topics should be specific, focused, and educationally valuable
+- Consider user's learning style and specific interests based on their preference
+- Title should be concise and under 255 characters
+- Description should be detailed and engaging (explain why it's relevant)
+- Assign appropriate difficulty levels (Easy, Medium, Hard)
+- Align topics with user preferences: ${user_preference}
+- Ensure topics complement existing coverage without redundancy
+- Focus on practical, applicable knowledge
+- Make topics progressively build understanding
+
+Generate personalized topics that create an optimal learning path for this user in "${
+        subject.subjectName
+      }" based on their preference: "${user_preference}".`;
+
+      const topicResponse = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: topicPrompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              generation_info: {
+                type: Type.OBJECT,
+                properties: {
+                  subject: {
+                    type: Type.STRING,
+                  },
+                  total_topics: {
+                    type: Type.NUMBER,
+                  },
+                  personalization_applied: {
+                    type: Type.BOOLEAN,
+                  },
+                },
+                propertyOrdering: [
+                  'subject',
+                  'total_topics',
+                  'personalization_applied',
+                ],
+              },
+              topics: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: {
+                      type: Type.STRING,
+                    },
+                    description: {
+                      type: Type.STRING,
+                    },
+                    difficulty: {
+                      type: Type.STRING,
+                    },
+                  },
+                  propertyOrdering: ['title', 'description', 'difficulty'],
+                },
+              },
+            },
+            propertyOrdering: ['generation_info', 'topics'],
+          },
+        },
+      });
+
+      const topicResponseText = topicResponse.text;
+
+      if (!topicResponseText) {
+        return res
+          .status(500)
+          .json(new ApiResponse(500, {}, 'AI Agent failed to generate topics'));
+      }
+
+      console.log('AI Agent has successfully generated personalized topics');
+
+      const generatedContent = JSON.parse(topicResponseText);
+
+      // Validate generated topics
+      if (
+        !generatedContent.topics ||
+        !Array.isArray(generatedContent.topics) ||
+        generatedContent.topics.length === 0
+      ) {
+        return res
+          .status(500)
+          .json(
+            new ApiResponse(500, {}, 'AI Agent failed to generate valid topics')
+          );
+      }
+
+      // Limit to maximum 4 topics
+      const topicsToCreate = generatedContent.topics.slice(0, 4);
+
+      // Insert topics into database
+      const insertedTopics = [];
+
+      for (const topic of topicsToCreate) {
+        // Validate topic structure
+        if (!topic.title || !topic.description) {
+          continue; // Skip invalid topics
+        }
+
+        // Validate and normalize difficulty
+        let difficulty = 'Medium'; // Default
+        if (topic.difficulty) {
+          const normalizedDifficulty = topic.difficulty.toLowerCase();
+          if (
+            normalizedDifficulty.includes('easy') ||
+            normalizedDifficulty.includes('beginner')
+          ) {
+            difficulty = 'Easy';
+          } else if (
+            normalizedDifficulty.includes('hard') ||
+            normalizedDifficulty.includes('advanced')
+          ) {
+            difficulty = 'Hard';
+          } else if (
+            normalizedDifficulty.includes('medium') ||
+            normalizedDifficulty.includes('intermediate')
+          ) {
+            difficulty = 'Medium';
+          }
+        }
+
+        const topicId = uuidv4();
+
+        try {
+          const insertedTopic = await db
+            .insert(topicsTable)
+            .values({
+              topicId: topicId,
+              subjectId: subjectId,
+              title: topic.title.trim(),
+              description: topic.description.trim(),
+              difficulty: difficulty as 'Easy' | 'Medium' | 'Hard',
+            })
+            .returning();
+
+          insertedTopics.push({
+            topicId: insertedTopic[0].topicId,
+            title: insertedTopic[0].title,
+            description: insertedTopic[0].description,
+            difficulty: insertedTopic[0].difficulty,
+            createdAt: insertedTopic[0].createdAt,
+          });
+        } catch (dbError) {
+          console.error('Error inserting topic:', dbError);
+          // Continue with other topics even if one fails
+        }
+      }
+
+      if (insertedTopics.length === 0) {
+        return res
+          .status(500)
+          .json(new ApiResponse(500, {}, 'Failed to create any topics'));
+      }
+
+      console.log(
+        `Successfully created ${insertedTopics.length} personalized topics for subject: ${subject.subjectName}`
+      );
+
+      // Return only the created topics data
+      const responseData = {
+        topics: insertedTopics,
+        total_created: insertedTopics.length,
+        subject_name: subject.subjectName,
+        user_preference: user_preference,
+      };
+
+      return res
+        .status(201)
+        .json(
+          new ApiResponse(
+            201,
+            responseData,
+            `Successfully generated ${insertedTopics.length} personalized topic(s) based on your preferences`
+          )
+        );
+    } catch (error) {
+      console.error('Error generating topics based on preferences:', error);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, {}, 'Internal server error'));
+    }
+  }
+);
