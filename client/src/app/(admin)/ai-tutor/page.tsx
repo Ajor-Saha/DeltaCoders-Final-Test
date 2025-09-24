@@ -58,6 +58,12 @@ interface InitializationState {
   totalSteps: number;
   stepMessage: string;
   chatInfo?: ChatInfo;
+  dataStatus?: {
+    hasVectorData: boolean;
+    enrolledSubjectsCount: number;
+    lastSyncNeeded: boolean;
+    subjects: string[];
+  };
 }
 
 const initializationSteps = [
@@ -95,6 +101,7 @@ export default function AITutorPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [initialization, setInitialization] = useState<InitializationState>({
     isInitialized: false,
     isInitializing: false,
@@ -136,22 +143,54 @@ export default function AITutorPage() {
     }));
 
     try {
-      // Step 1: Sync user data to vector database
+      // Step 1: Check if user data already exists
       setInitialization(prev => ({
         ...prev,
         currentStep: 1,
-        stepMessage: initializationSteps[0],
+        stepMessage: "🔍 Agent is checking your existing data...",
       }));
 
-      const syncResponse = await Axios.post('/api/aibot/sync-data', {}, {
+      const statusResponse = await Axios.get('/api/aibot/check-data-status', {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
       });
 
-      // Show progress through steps
-      for (let step = 2; step <= initializationSteps.length; step++) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+      const dataStatus = statusResponse.data.data;
+      setInitialization(prev => ({
+        ...prev,
+        dataStatus,
+      }));
+
+      // Step 2: Sync data only if needed
+      if (dataStatus.lastSyncNeeded) {
+        setInitialization(prev => ({
+          ...prev,
+          currentStep: 2,
+          stepMessage: initializationSteps[0],
+        }));
+
+        await Axios.post('/api/aibot/sync-data', {}, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        toast.success(
+          `🎯 AI Tutor synced data from ${dataStatus.enrolledSubjectsCount} subjects`,
+          { duration: 3000 }
+        );
+      } else {
+        setInitialization(prev => ({
+          ...prev,
+          currentStep: 2,
+          stepMessage: "✅ Your data is already synced and ready!",
+        }));
+      }
+
+      // Show remaining progress steps quickly
+      for (let step = 3; step <= initializationSteps.length; step++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
         setInitialization(prev => ({
           ...prev,
           currentStep: step,
@@ -209,10 +248,11 @@ export default function AITutorPage() {
         isInitializing: false,
       }));
 
-      toast.success(
-        `🎉 AI Tutor initialized! Synced ${syncResponse.data.data?.synced || 0} learning records`,
-        { duration: 4000 }
-      );
+      const successMessage = dataStatus.lastSyncNeeded
+        ? `🎉 AI Tutor initialized and synced ${dataStatus.enrolledSubjectsCount} subjects!`
+        : `🎉 AI Tutor ready! Using existing data from ${dataStatus.enrolledSubjectsCount} subjects`;
+
+      toast.success(successMessage, { duration: 4000 });
 
     } catch (error: any) {
       console.error('Error initializing AI Tutor:', error);
@@ -222,6 +262,52 @@ export default function AITutorPage() {
       }));
       const errorMessage = error.response?.data?.message || error.message || 'Failed to initialize AI Tutor';
       toast.error("Failed to initialize AI Tutor: " + errorMessage);
+    }
+  };
+
+  const refreshUserData = async () => {
+    if (!isAuthenticated || !accessToken) {
+      toast.error("Please log in to refresh data");
+      return;
+    }
+
+    setIsRefreshing(true);
+
+    try {
+      toast.info("🔄 Refreshing your learning data...", { duration: 2000 });
+
+      const syncResponse = await Axios.post('/api/aibot/sync-data',
+        { force: true }, // Force refresh
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      // Update data status
+      const statusResponse = await Axios.get('/api/aibot/check-data-status', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      setInitialization(prev => ({
+        ...prev,
+        dataStatus: statusResponse.data.data,
+      }));
+
+      toast.success(
+        `✅ Data refreshed successfully! Updated ${syncResponse.data.data?.synced || 0} records`,
+        { duration: 4000 }
+      );
+
+    } catch (error: any) {
+      console.error('Error refreshing user data:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to refresh data';
+      toast.error("Failed to refresh data: " + errorMessage);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -482,15 +568,32 @@ export default function AITutorPage() {
           <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
             <Bot className="w-6 h-6 text-white" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
               AI Tutor
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Your personalized learning assistant
+              {initialization.dataStatus && (
+                <span className="ml-2">
+                  • {initialization.dataStatus.enrolledSubjectsCount} subjects
+                </span>
+              )}
             </p>
           </div>
-          <div className="ml-auto">
+          <div className="flex items-center gap-2">
+            {initialization.isInitialized && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={refreshUserData}
+                disabled={isRefreshing}
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:text-purple-300 dark:hover:bg-purple-900/20"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+              </Button>
+            )}
             <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
               <Sparkles className="w-3 h-3 mr-1" />
               Ready
@@ -513,6 +616,13 @@ export default function AITutorPage() {
               <p className="text-gray-600 dark:text-gray-400 mb-2">
                 I'm your AI Tutor, trained on your personal learning data.
               </p>
+              {initialization.dataStatus && (
+                <p className="text-sm text-blue-600 dark:text-blue-400 mb-2">
+                  📚 I have access to your learning data from {initialization.dataStatus.enrolledSubjectsCount} subjects: {" "}
+                  {initialization.dataStatus.subjects.slice(0, 3).join(", ")}
+                  {initialization.dataStatus.subjects.length > 3 && ` and ${initialization.dataStatus.subjects.length - 3} more`}
+                </p>
+              )}
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
                 I can help you understand concepts, explain your quiz results, suggest study plans, and answer questions based on your learning history.
               </p>

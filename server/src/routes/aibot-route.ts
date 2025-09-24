@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  checkUserDataStatus,
   deactivateUserChat,
   getUserChatHistory,
   queryUserChatbot,
@@ -10,6 +11,7 @@ import { verifyJWT } from '../middleware/auth-middleware';
 const aibot_router = Router();
 
 // All routes require authentication for AI chatbot
+aibot_router.route('/check-data-status').get(verifyJWT, checkUserDataStatus);
 aibot_router.route('/sync-data').post(verifyJWT, syncUserDataToVectorDB);
 aibot_router.route('/chat').post(verifyJWT, queryUserChatbot);
 aibot_router.route('/chat-history').get(verifyJWT, getUserChatHistory);
