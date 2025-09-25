@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Axios } from "@/config/axios";
 import useAuthStore from "@/store/store";
 import {
   Activity,
@@ -103,60 +105,36 @@ export default function DashboardClient() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // Mock data for now - replace with actual API calls
+
+      // Fetch real dashboard statistics and recent quizzes in parallel
+      const [statsResponse, recentQuizzesResponse] = await Promise.all([
+        Axios.get('/api/dashboard/stats', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }),
+        Axios.get('/api/dashboard/recent-quizzes', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }),
+      ]);
+
+      const statsData = statsResponse.data.success ? statsResponse.data.data : {
+        totalQuizzes: 0,
+        avgQuizScore: 0,
+        totalGamesPlayed: 0,
+        avgCognitiveScore: 0,
+        coursesEnrolled: 0,
+      };
+
+      const recentQuizzesData = recentQuizzesResponse.data.success
+        ? recentQuizzesResponse.data.data
+        : [];
+
+      // Mock data for other sections (to be replaced with real APIs later)
       const mockData = {
-        recentQuizzes: [
-          {
-            resultId: "1",
-            quizId: "q1",
-            score: 85,
-            totalMarks: 10,
-            timeTaken: 300,
-            completedAt: new Date().toISOString(),
-            subject: { name: "Mathematics" },
-            topic: { title: "Calculus Basics" }
-          },
-          {
-            resultId: "2",
-            quizId: "q2",
-            score: 92,
-            totalMarks: 15,
-            timeTaken: 420,
-            completedAt: new Date(Date.now() - 86400000).toISOString(),
-            subject: { name: "Physics" },
-            topic: { title: "Quantum Mechanics" }
-          },
-          {
-            resultId: "3",
-            quizId: "q3",
-            score: 78,
-            totalMarks: 12,
-            timeTaken: 280,
-            completedAt: new Date(Date.now() - 172800000).toISOString(),
-            subject: { name: "Chemistry" },
-            topic: { title: "Organic Chemistry" }
-          },
-          {
-            resultId: "4",
-            quizId: "q4",
-            score: 88,
-            totalMarks: 20,
-            timeTaken: 900,
-            completedAt: new Date(Date.now() - 259200000).toISOString(),
-            subject: { name: "Biology" },
-            topic: { title: "Genetics" }
-          },
-          {
-            resultId: "5",
-            quizId: "q5",
-            score: 73,
-            totalMarks: 8,
-            timeTaken: 200,
-            completedAt: new Date(Date.now() - 345600000).toISOString(),
-            subject: { name: "History" },
-            topic: { title: "World Wars" }
-          }
-        ],
+        recentQuizzes: recentQuizzesData,
         gameResults: [
           {
             gameId: "g1",
@@ -283,13 +261,7 @@ export default function DashboardClient() {
             completedLessons: 1
           }
         ],
-        stats: {
-          totalQuizzes: 15,
-          avgQuizScore: 85,
-          totalGamesPlayed: 28,
-          avgCognitiveScore: 83,
-          coursesEnrolled: 7,
-        }
+        stats: statsData
       };
       setDashboardData(mockData);
     } catch (error) {
@@ -344,11 +316,115 @@ export default function DashboardClient() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
+      <div className="flex min-h-screen w-full flex-col">
+        <main className="flex-1 p-4 sm:p-6 md:p-8">
+          <div className="space-y-6">
+            {/* Welcome Header Skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-80" />
+                <Skeleton className="h-5 w-64" />
+              </div>
+              <Skeleton className="h-6 w-32" />
+            </div>
+
+            {/* Stats Overview Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Card key={i} className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-8 w-12" />
+                      </div>
+                      <Skeleton className="h-8 w-8 rounded-md" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Tabs Skeleton */}
+            <div className="space-y-6">
+              <div className="flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                <div className="grid w-full grid-cols-4 gap-1">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
+                </div>
+              </div>
+
+              {/* Main Content Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Quiz Results Skeleton */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-5" />
+                      <Skeleton className="h-6 w-40" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-5 w-24" />
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                        <div className="text-right space-y-2">
+                          <Skeleton className="h-8 w-12" />
+                          <Skeleton className="h-3 w-8" />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Chart Skeleton */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-5" />
+                      <Skeleton className="h-6 w-32" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-64">
+                    <Skeleton className="h-full w-full" />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Second Row Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-5" />
+                      <Skeleton className="h-6 w-40" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-64">
+                    <Skeleton className="h-full w-full" />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-5" />
+                      <Skeleton className="h-6 w-44" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="h-64">
+                    <Skeleton className="h-full w-full" />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -461,32 +537,44 @@ export default function DashboardClient() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {dashboardData.recentQuizzes.map((quiz) => (
-                      <div key={quiz.resultId} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                            {quiz.subject.name}
-                          </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {quiz.topic.title}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-500">
-                              {Math.floor(quiz.timeTaken / 60)}m {quiz.timeTaken % 60}s
-                            </span>
+                    {dashboardData.recentQuizzes.length > 0 ? (
+                      dashboardData.recentQuizzes.map((quiz) => (
+                        <div key={quiz.resultId} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                              {quiz.subject.name}
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {quiz.topic.title}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Clock className="w-3 h-3 text-gray-400" />
+                              <span className="text-xs text-gray-500">
+                                {Math.floor(quiz.timeTaken / 60)}m {quiz.timeTaken % 60}s
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-2xl font-bold ${getScoreColor(quiz.score)}`}>
+                              {quiz.score}%
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {Math.round((quiz.score / 100) * quiz.totalMarks)}/{quiz.totalMarks}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className={`text-2xl font-bold ${getScoreColor(quiz.score)}`}>
-                            {quiz.score}%
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {Math.round((quiz.score / 100) * quiz.totalMarks)}/{quiz.totalMarks}
-                          </div>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                          No Quiz Results Yet
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-400">
+                          Start taking quizzes to see your recent results here.
+                        </p>
                       </div>
-                    ))}
+                    )}
                   </CardContent>
                 </Card>
 
