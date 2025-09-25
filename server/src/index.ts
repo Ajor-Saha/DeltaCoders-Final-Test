@@ -6,6 +6,7 @@ import logger from 'morgan';
 import aibot_router from './routes/aibot-route';
 import user_router from './routes/auth-route';
 import cognitive_assessment_router from './routes/cognitive-assessment-route';
+import dashboard_router from './routes/dashboard-route';
 import gameAnalyticsRouter from './routes/game-analytics-route';
 import question_router from './routes/question-route';
 import resource_router from './routes/resource-route';
@@ -45,6 +46,8 @@ app.use('/api/resource', resource_router);
 app.use('/api/aibot', aibot_router);
 // Mount cognitive assessment router
 app.use('/api/cognitive-assessment', cognitive_assessment_router);
+// Mount dashboard router
+app.use('/api/dashboard', dashboard_router);
 // Mount game analytics router
 app.use('/api/games', gameAnalyticsRouter);
 // Mount weak lessons router
