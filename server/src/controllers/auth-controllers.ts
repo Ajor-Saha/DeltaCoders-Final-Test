@@ -184,7 +184,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 72 * 60 * 60 * 1000, // 3 days
       sameSite:
         process.env.NODE_ENV === 'production'
           ? ('none' as const)
@@ -623,6 +623,61 @@ export const updateUserProfile = asyncHandler(
       return res
         .status(500)
         .json(new ApiResponse(500, {}, 'Error updating profile'));
+    }
+  }
+);
+
+// Server status controller for sign-in page
+export const getServerStatus = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      // Simulate server wake-up time (you can adjust this based on your needs)
+      const serverStartTime = process.uptime(); // Time since server started in seconds
+      const isServerReady = serverStartTime > 5; // Consider server ready after 5 seconds
+
+      let status = 'starting';
+      let message = 'Server is starting, please wait a moment...';
+
+      if (isServerReady) {
+        status = 'ready';
+        message = 'Server is ready! You can now sign in.';
+      } else if (serverStartTime > 2) {
+        status = 'waking';
+        message = 'Server is waking up from sleeping mode...';
+      } else if (serverStartTime > 1) {
+        status = 'starting';
+        message = 'Server is starting, please wait a moment...';
+      } else {
+        status = 'initializing';
+        message =
+          'Server is initializing, this will only take a few seconds...';
+      }
+
+      return res.status(200).json(
+        new ApiResponse(
+          200,
+          {
+            status,
+            message,
+            uptime: Math.floor(serverStartTime),
+            isReady: isServerReady,
+          },
+          'Server status retrieved successfully'
+        )
+      );
+    } catch (error) {
+      console.error('Error getting server status:', error);
+      return res.status(500).json(
+        new ApiResponse(
+          500,
+          {
+            status: 'error',
+            message: 'Unable to check server status',
+            isReady: false,
+          },
+          'Error getting server status'
+        )
+      );
     }
   }
 );
