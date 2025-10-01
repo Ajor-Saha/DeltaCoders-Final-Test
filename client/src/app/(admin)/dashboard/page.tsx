@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Trophy
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -77,10 +78,12 @@ interface Course {
   enrolledAt: string;
   totalLessons: number;
   completedLessons: number;
+  level: string; // beginner, intermediate, advanced
 }
 
 export default function DashboardClient() {
   const { accessToken, user } = useAuthStore();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
     recentQuizzes: [] as QuizResult[],
@@ -106,14 +109,19 @@ export default function DashboardClient() {
     try {
       setLoading(true);
 
-      // Fetch real dashboard statistics and recent quizzes in parallel
-      const [statsResponse, recentQuizzesResponse] = await Promise.all([
+      // Fetch real dashboard statistics, recent quizzes, and subjects with progress in parallel
+      const [statsResponse, recentQuizzesResponse, subjectsProgressResponse] = await Promise.all([
         Axios.get('/api/dashboard/stats', {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
         }),
         Axios.get('/api/dashboard/recent-quizzes', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }),
+        Axios.get('/api/dashboard/subjects-progress', {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -130,6 +138,10 @@ export default function DashboardClient() {
 
       const recentQuizzesData = recentQuizzesResponse.data.success
         ? recentQuizzesResponse.data.data
+        : [];
+
+      const subjectsProgressData = subjectsProgressResponse.data.success
+        ? subjectsProgressResponse.data.data
         : [];
 
       // Mock data for other sections (to be replaced with real APIs later)
@@ -203,64 +215,15 @@ export default function DashboardClient() {
             createdAt: new Date(Date.now() - 172800000).toISOString()
           }
         ],
-        courses: [
-          {
-            courseId: "c1",
-            courseName: "Advanced Mathematics",
-            progress: 65,
-            enrolledAt: new Date(Date.now() - 604800000).toISOString(),
-            totalLessons: 20,
-            completedLessons: 13
-          },
-          {
-            courseId: "c2",
-            courseName: "Physics Fundamentals",
-            progress: 40,
-            enrolledAt: new Date(Date.now() - 1209600000).toISOString(),
-            totalLessons: 15,
-            completedLessons: 6
-          },
-          {
-            courseId: "c3",
-            courseName: "Intro to Biology",
-            progress: 55,
-            enrolledAt: new Date(Date.now() - 1814400000).toISOString(),
-            totalLessons: 18,
-            completedLessons: 10
-          },
-          {
-            courseId: "c4",
-            courseName: "World History",
-            progress: 30,
-            enrolledAt: new Date(Date.now() - 2419200000).toISOString(),
-            totalLessons: 16,
-            completedLessons: 5
-          },
-          {
-            courseId: "c5",
-            courseName: "Organic Chemistry",
-            progress: 20,
-            enrolledAt: new Date(Date.now() - 3024000000).toISOString(),
-            totalLessons: 22,
-            completedLessons: 4
-          },
-          {
-            courseId: "c6",
-            courseName: "Computer Science Basics",
-            progress: 75,
-            enrolledAt: new Date(Date.now() - 3628800000).toISOString(),
-            totalLessons: 24,
-            completedLessons: 18
-          },
-          {
-            courseId: "c7",
-            courseName: "Creative Writing",
-            progress: 10,
-            enrolledAt: new Date(Date.now() - 4233600000).toISOString(),
-            totalLessons: 12,
-            completedLessons: 1
-          }
-        ],
+        courses: subjectsProgressData.map((subject: any) => ({
+          courseId: subject.subjectId,
+          courseName: subject.subjectName,
+          progress: subject.progressPercentage,
+          enrolledAt: subject.enrolledAt,
+          totalLessons: subject.totalTopics,
+          completedLessons: subject.completedTopics,
+          level: subject.level
+        })),
         stats: statsData
       };
       setDashboardData(mockData);
@@ -282,6 +245,11 @@ export default function DashboardClient() {
     if (score >= 80) return "bg-green-500";
     if (score >= 60) return "bg-yellow-500";
     return "bg-red-500";
+  };
+
+  const handleContinueLearning = (subjectName: string) => {
+    const encodedName = subjectName.toLowerCase().replace(/\s+/g, '-');
+    router.push(`/subjects/${encodedName}`);
   };
 
   // Derived chart data
@@ -774,7 +742,12 @@ export default function DashboardClient() {
                             </span>
                           </div>
 
-                          <Button variant="outline" size="sm" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => handleContinueLearning(course.courseName)}
+                          >
                             Continue Learning
                           </Button>
                         </div>

@@ -177,3 +177,96 @@ export const getRecentQuizzes = asyncHandler(
     }
   }
 );
+
+export const getAllSubjectsWithProgress = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.userId;
+
+      if (!userId) {
+        return res
+          .status(401)
+          .json(new ApiResponse(401, null, 'User not authenticated'));
+      }
+
+      // Get all subjects the user is enrolled in
+      const userSubjects = await db
+        .select({
+          subjectId: userSubjectsTable.subjectId,
+          subjectName: subjectsTable.subjectName,
+          level: userSubjectsTable.level,
+          enrolledAt: userSubjectsTable.createdAt,
+        })
+        .from(userSubjectsTable)
+        .innerJoin(
+          subjectsTable,
+          eq(userSubjectsTable.subjectId, subjectsTable.subjectId)
+        )
+        .where(eq(userSubjectsTable.userId, userId));
+
+      // For each subject, get total topics and completed topics (topics with attempted quizzes)
+      const subjectsWithProgress = await Promise.all(
+        userSubjects.map(async subject => {
+          // Get total topics for this subject
+          const totalTopicsResult = await db
+            .select({
+              count: sql<number>`COUNT(*)`,
+            })
+            .from(topicsTable)
+            .where(eq(topicsTable.subjectId, subject.subjectId));
+
+          const totalTopics = Number(totalTopicsResult[0]?.count || 0);
+
+          // Get completed topics (topics where user has attempted quiz at least once)
+          const completedTopicsResult = await db
+            .select({
+              count: sql<number>`COUNT(DISTINCT ${topicsTable.topicId})`,
+            })
+            .from(topicsTable)
+            .innerJoin(
+              quizzesTable,
+              eq(topicsTable.topicId, quizzesTable.topicId)
+            )
+            .where(
+              sql`${topicsTable.subjectId} = ${subject.subjectId} AND ${quizzesTable.userId} = ${userId} AND ${quizzesTable.attemptCount} > 0`
+            );
+
+          const completedTopics = Number(completedTopicsResult[0]?.count || 0);
+
+          // Calculate progress percentage
+          const progressPercentage =
+            totalTopics > 0
+              ? Math.round((completedTopics / totalTopics) * 100)
+              : 0;
+
+          return {
+            subjectId: subject.subjectId,
+            subjectName: subject.subjectName,
+            level: subject.level,
+            enrolledAt: subject.enrolledAt,
+            totalTopics,
+            completedTopics,
+            progressPercentage,
+          };
+        })
+      );
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            subjectsWithProgress,
+            'Subjects with progress retrieved successfully'
+          )
+        );
+    } catch (error) {
+      console.error('Error fetching subjects with progress:', error);
+      return res
+        .status(500)
+        .json(
+          new ApiResponse(500, null, 'Failed to fetch subjects with progress')
+        );
+    }
+  }
+);

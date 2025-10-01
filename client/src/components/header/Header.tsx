@@ -113,9 +113,7 @@ function Header() {
             <a href="#resources" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
               Resources
             </a>
-            <Link href="/games" className=" dark:text-gray-200 hover:text-pink-400 dark:hover:text-white">
-              Games
-            </Link>
+
           </nav>
           {/* Right Side: Avatar Dropdown (if logged in) or Login Button & Theme Toggle */}
           <div className="flex items-center space-x-1 sm:space-x-3 md:space-x-4">
@@ -231,13 +229,7 @@ function Header() {
             >
               Resources
             </a>
-            <Link
-              href="/games"
-              className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"
-              onClick={closeMenu}
-            >
-              Games
-            </Link>
+
             <a
               href="#pricing"
               className="block py-1.5 sm:py-2 dark:text-gray-200 dark:hover:text-white text-sm sm:text-base"

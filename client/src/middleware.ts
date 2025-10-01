@@ -10,10 +10,10 @@ export function middleware(request: NextRequest) {
   }
 
   // List of paths that do not require authentication
-  const publicPaths = ["/home", "/sign-in", "/sign-up", "/verify/:email", "/create-new-company", "/starter-feed", "/courses"];
+  const publicPaths = ["/home", "/sign-in", "/sign-up", "/verify/:email", "/starter-feed", "/courses"];
 
   // Auth-only paths (logged in users shouldn't access these)
-  const authOnlyPaths = ["/sign-in", "/create-new-company"];
+  const authOnlyPaths = ["/sign-in", "/sign-up", "/verify/:email"];
 
   // Allow API authentication endpoints without session validation
   const apiAuthPaths = ["/api/auth/", "/api/auth/**"];

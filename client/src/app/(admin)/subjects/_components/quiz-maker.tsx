@@ -97,6 +97,9 @@ interface QuizState {
   // Results viewer states
   showResultsModal: boolean;
   selectedQuizResults: any | null;
+  // AI processing states
+  currentAIStep: 'idle' | 'evaluating' | 'cognitive' | 'complete';
+  aiProcessingMessage: string;
 }
 
 const difficultyColors = {
@@ -132,6 +135,8 @@ export function QuizMaker({
     isLoadingQuizzes: false,
     showResultsModal: false,
     selectedQuizResults: null,
+    currentAIStep: 'idle',
+    aiProcessingMessage: '',
   });
 
   // Auto-start quiz when data is available and user hasn't chosen to show quiz list
@@ -351,7 +356,12 @@ export function QuizMaker({
     if (quizState.isSubmitting || quizState.showResults) return;
     if (!quizData?.questions || !accessToken) return;
 
-    setQuizState(prev => ({ ...prev, isSubmitting: true }));
+    setQuizState(prev => ({
+      ...prev,
+      isSubmitting: true,
+      currentAIStep: 'evaluating',
+      aiProcessingMessage: '🤖 AI Agent 1: Evaluating your quiz answers, identifying weaknesses and generating feedback...'
+    }));
 
     try {
       // Format answers for submission
@@ -376,6 +386,13 @@ export function QuizMaker({
       if (response.data.success) {
         const { score, feedback, weaknesses, correctAnswers: serverCorrectCount, totalQuestions: serverTotalQuestions } = response.data.data;
 
+        // Update to second AI step
+        setQuizState(prev => ({
+          ...prev,
+          currentAIStep: 'cognitive',
+          aiProcessingMessage: '🧠 AI Agent 2: Analyzing your quiz performance, weaknesses, and feedback to calculate cognitive scores. Please be patient while our AI processes your data...'
+        }));
+
         // Compute detailed correctness for mental status payload
         const questionsPayload = quizData.questions.map((q, index) => ({
           id: q.id,
@@ -385,7 +402,7 @@ export function QuizMaker({
 
         // Compute totals based on selections
         const totalCorrect = questionsPayload.filter(q => q.correct).length;
-  const totalQuestions = quizData.questions.length;
+        const totalQuestions = quizData.questions.length;
 
         // Derive weakness topics: use incorrect question texts
         const weaknessTopics: string[] = quizData.questions
@@ -438,6 +455,16 @@ export function QuizMaker({
         // Store weakness summary for future quiz generation
         const weaknessSummary = weaknesses?.map((w: any) => w.question).join(', ') || '';
 
+        // Final completion step
+        setQuizState(prev => ({
+          ...prev,
+          currentAIStep: 'complete',
+          aiProcessingMessage: '✅ AI processing complete! Your results are ready.'
+        }));
+
+        // Short delay to show completion message
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         setQuizState(prev => ({
           ...prev,
           showResults: true,
@@ -449,6 +476,8 @@ export function QuizMaker({
           mentalScores,
           lastWeakness: weaknessSummary,
           isSubmitting: false,
+          currentAIStep: 'idle',
+          aiProcessingMessage: '',
         }));
 
         // Show result toast
@@ -466,7 +495,12 @@ export function QuizMaker({
       console.error('Error submitting quiz:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to submit quiz';
       toast.error('Failed to submit quiz: ' + errorMessage);
-      setQuizState(prev => ({ ...prev, isSubmitting: false }));
+      setQuizState(prev => ({
+        ...prev,
+        isSubmitting: false,
+        currentAIStep: 'idle',
+        aiProcessingMessage: ''
+      }));
     }
   };
 
@@ -485,6 +519,8 @@ export function QuizMaker({
       lastWeakness: quizState.lastWeakness,
       showResultsModal: false,
       selectedQuizResults: null,
+      currentAIStep: 'idle',
+      aiProcessingMessage: '',
     });
     if (onRetakeQuiz) onRetakeQuiz();
   };
@@ -1089,13 +1125,20 @@ export function QuizMaker({
               <Button
                 onClick={handleSubmitQuiz}
                 disabled={quizState.isSubmitting}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 min-w-[200px]"
               >
                 {quizState.isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Submitting...
-                  </>
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Processing...</span>
+                    </div>
+                    {quizState.aiProcessingMessage && (
+                      <div className="text-xs text-center opacity-90 max-w-[300px] leading-tight">
+                        {quizState.aiProcessingMessage}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   "Submit Quiz"
                 )}
@@ -1115,6 +1158,61 @@ export function QuizMaker({
         onClose={closeResultsModal}
         results={quizState.selectedQuizResults}
       />
+
+      {/* AI Processing Overlay */}
+      {quizState.isSubmitting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="max-w-md w-full mx-4">
+            <CardContent className="p-6 text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  AI Processing Your Quiz
+                </h3>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="space-y-3 mb-4">
+                <div className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                  quizState.currentAIStep === 'evaluating' ? 'bg-blue-50 dark:bg-blue-900/20' :
+                  quizState.currentAIStep === 'cognitive' || quizState.currentAIStep === 'complete' ? 'bg-green-50 dark:bg-green-900/20' :
+                  'bg-gray-50 dark:bg-gray-800'
+                }`}>
+                  <div className={`w-3 h-3 rounded-full ${
+                    quizState.currentAIStep === 'evaluating' ? 'bg-blue-600 animate-pulse' :
+                    quizState.currentAIStep === 'cognitive' || quizState.currentAIStep === 'complete' ? 'bg-green-600' :
+                    'bg-gray-300'
+                  }`} />
+                  <span className="text-sm text-left">🤖 Agent 1: Evaluating answers & feedback</span>
+                </div>
+
+                <div className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                  quizState.currentAIStep === 'cognitive' ? 'bg-blue-50 dark:bg-blue-900/20' :
+                  quizState.currentAIStep === 'complete' ? 'bg-green-50 dark:bg-green-900/20' :
+                  'bg-gray-50 dark:bg-gray-800'
+                }`}>
+                  <div className={`w-3 h-3 rounded-full ${
+                    quizState.currentAIStep === 'cognitive' ? 'bg-blue-600 animate-pulse' :
+                    quizState.currentAIStep === 'complete' ? 'bg-green-600' :
+                    'bg-gray-300'
+                  }`} />
+                  <span className="text-sm text-left">🧠 Agent 2: Computing cognitive scores</span>
+                </div>
+              </div>
+
+              {quizState.aiProcessingMessage && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  {quizState.aiProcessingMessage}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-4">
+                Please be patient while our AI agents process your data...
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

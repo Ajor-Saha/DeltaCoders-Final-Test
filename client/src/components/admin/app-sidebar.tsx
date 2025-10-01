@@ -24,14 +24,13 @@ import { env } from "@/config/env";
 import useAuthStore from "@/store/store";
 import {
   Bot,
-  Building2,
   FolderKanban,
   GalleryVerticalEnd,
+  Gamepad2,
   KeyRound,
   List,
   Minus,
   Plus,
-  PlusCircle,
   SettingsIcon,
   UserCog
 } from "lucide-react";
@@ -48,11 +47,6 @@ const sidebarData = {
       url: "/subjects",
       icon: <FolderKanban size={20} />,
       items: [
-        {
-          title: "Add Subject",
-          url: "/subjects",
-          icon: <PlusCircle size={16} />,
-        },
         {
           title: "All Subjects",
           url: "/subjects",
@@ -71,11 +65,6 @@ const sidebarData = {
           icon: <UserCog size={16} />,
         },
         {
-          title: "Company Manage",
-          url: "/settings/company-manage",
-          icon: <Building2 size={16} />,
-        },
-        {
           title: "Password Manage",
           url: "/settings/password-manage",
           icon: <KeyRound size={16} />,
@@ -83,10 +72,16 @@ const sidebarData = {
       ],
     },
     {
+      title: "Games",
+      url: "/games",
+      icon: <Gamepad2 size={20} />,
+    },
+    {
       title: "AI Support",
       url: "/ai-tutor",
       icon: <Bot size={20} />,
     },
+
   ],
 };
 

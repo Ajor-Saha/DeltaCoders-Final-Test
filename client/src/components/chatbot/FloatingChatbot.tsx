@@ -13,6 +13,7 @@ interface Message {
   text: string;
   sender: "user" | "bot";
   timestamp: Date;
+  hasLink?: boolean;
 }
 
 const FloatingChatbot = () => {
@@ -20,12 +21,56 @@ const FloatingChatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Hello! I'm your AI assistant. How can I help you today?",
+      text: "Hello! I'm your SmartStudy AI assistant. I'm here to help you navigate and use this platform efficiently. Feel free to ask me about features, how to get started, or any questions about the platform!",
       sender: "bot",
       timestamp: new Date(),
     },
   ]);
   const [inputMessage, setInputMessage] = useState("");
+
+  const getBotResponse = (userMessage: string): string => {
+    const message = userMessage.toLowerCase();
+
+    // Platform navigation and features
+    if (message.includes('dashboard') || message.includes('home')) {
+      return "📊 The Dashboard shows your learning progress, recent quiz results, cognitive scores, and enrolled subjects. You can track your performance and see analytics of your learning journey!";
+    }
+
+    if (message.includes('subject') || message.includes('course') || message.includes('topic')) {
+      return "📚 You can add subjects, generate AI-powered topics and lessons, take quizzes, and track your progress. Each subject has multiple topics with generated content tailored to your learning level!";
+    }
+
+    if (message.includes('quiz') || message.includes('test') || message.includes('exam')) {
+      return "🎯 Our AI generates adaptive quizzes based on your topics. After completing quizzes, you'll get detailed results, cognitive assessments, and weak area identification for targeted learning!";
+    }
+
+    if (message.includes('ai') || message.includes('tutor') || message.includes('chat')) {
+      return "🤖 Our AI tutor feature (currently in development) will provide personalized learning assistance based on your progress data. You can chat with it about your course content!";
+    }
+
+    if (message.includes('game') || message.includes('cognitive') || message.includes('brain')) {
+      return "🧠 Play cognitive games to improve attention, memory, and focus. The platform tracks your game analytics and provides cognitive assessments to measure your mental performance!";
+    }
+
+    if (message.includes('progress') || message.includes('track') || message.includes('analytics')) {
+      return "📈 Track your learning progress per subject, view quiz results over time, monitor cognitive scores, and identify weak topics that need more attention. All data is visualized in beautiful charts!";
+    }
+
+    if (message.includes('resource') || message.includes('material') || message.includes('video')) {
+      return "📖 The platform curates external learning resources including YouTube videos and documentation for each topic to supplement your learning experience!";
+    }
+
+    if (message.includes('start') || message.includes('begin') || message.includes('how to') || message.includes('getting started')) {
+      return "🚀 Getting Started:\n1. Add a subject from the dashboard\n2. Generate AI topics and lessons\n3. Take quizzes to test your knowledge\n4. Review your progress and weak areas\n5. Use curated resources for deeper learning\n6. Play cognitive games for brain training!";
+    }
+
+    if (message.includes('feature') || message.includes('what can') || message.includes('capabilities')) {
+      return "✨ Platform Features:\n• AI-generated lessons & quizzes\n• Progress tracking & analytics\n• Cognitive assessments\n• Brain training games\n• Weak topic identification\n• External resource curation\n• Personalized learning paths\n• Real-time performance monitoring";
+    }
+
+    // Default response for unmatched queries
+    return "🔧 This chatbot feature is currently being enhanced! For now, I can help you understand how to use SmartStudy efficiently.\n\n💡 Try asking about: subjects, quizzes, dashboard, progress tracking, games, or getting started.\n\n🔗 You can explore more features and our codebase on GitHub:\n\nFeel free to ask me anything about navigating the platform!";
+  };
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -44,13 +89,17 @@ const FloatingChatbot = () => {
     setMessages((prev) => [...prev, newMessage]);
     setInputMessage("");
 
-    // Simulate bot response
+    // Generate intelligent bot response
     setTimeout(() => {
+      const responseText = getBotResponse(inputMessage);
+      const hasGitHubLink = responseText.includes("GitHub:");
+
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Thank you for your message! I'm a demo chatbot. How else can I assist you?",
+        text: responseText,
         sender: "bot",
         timestamp: new Date(),
+        hasLink: hasGitHubLink,
       };
       setMessages((prev) => [...prev, botResponse]);
     }, 1000);
@@ -60,6 +109,37 @@ const FloatingChatbot = () => {
     if (e.key === "Enter") {
       sendMessage();
     }
+  };
+
+  const renderMessageContent = (message: Message) => {
+    if (message.hasLink && message.text.includes("GitHub:")) {
+      const parts = message.text.split("GitHub:");
+      return (
+        <div>
+          {parts[0]}
+          <span className="font-semibold">GitHub:</span>
+          <br />
+          <a
+            href="https://github.com/Ajor-Saha/DeltaCoders-Final-Test"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 underline font-medium transition-colors duration-200"
+          >
+            🔗 DeltaCoders-Final-Test Repository
+          </a>
+          <br />
+          {parts[1]}
+        </div>
+      );
+    }
+
+    // For regular messages, preserve line breaks
+    return message.text.split('\n').map((line, index) => (
+      <React.Fragment key={index}>
+        {line}
+        {index < message.text.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
   };
 
   return (
@@ -117,7 +197,7 @@ const FloatingChatbot = () => {
                             : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         }`}
                       >
-                        {message.text}
+                        {renderMessageContent(message)}
                       </div>
                     </div>
                   ))}
