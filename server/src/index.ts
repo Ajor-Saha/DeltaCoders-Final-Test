@@ -25,7 +25,11 @@ app.use(cookieParser());
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://study-flow.taskforges.com',
+    ],
     credentials: true,
     maxAge: 86400,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
