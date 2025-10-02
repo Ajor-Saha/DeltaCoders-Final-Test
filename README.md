@@ -39,7 +39,7 @@ StudyFlow addresses these challenges by:
 - **Gamified Learning**: Implementing engaging, interactive elements to boost motivation
 - **Adaptive Assessment**: Creating dynamic quizzes and evaluations that adjust to student performance
 
-## 4. ✨ Key Features
+## 3. 🚀 Live Demo
 
 🌐 **[Experience StudyFlow Live](https://study-flow.taskforges.com)**
 
@@ -53,7 +53,7 @@ StudyFlow addresses these challenges by:
 - **Email**: sokarama79@gmail.com
 - **Password**: sokarama79@gmail.com
 
-## 3. ✨ Key Features
+## 4. ✨ Key Features
 
 ### 🧠 AI-Powered Learning Engine
 
@@ -97,7 +97,7 @@ StudyFlow addresses these challenges by:
 - **Time Tracking**: Monitors study time and learning patterns
 - **Progress Reports**: Detailed reports for students and educators
 
-## 4. 🛠️ Technical Stack
+## 5. 🛠️ Technical Stack
 
 ### Frontend Architecture
 
@@ -327,9 +327,6 @@ studyflow/
 │   └── package.json               # Backend dependencies
 ```
 
-````
-
-
 ### Development Guidelines
 
 - **Code Style**: Follow TypeScript best practices with strict type checking
@@ -337,8 +334,6 @@ studyflow/
 - **Testing**: Write unit tests for critical functionality
 - **Documentation**: Keep inline documentation updated
 - **Performance**: Optimize for Core Web Vitals and loading speed
-
-
 
 ## 8. 🤝 Contributing
 
@@ -349,8 +344,9 @@ We welcome contributions from the community! Here's how you can help:
 1. **Fork the Repository**
 
    ```bash
-   git fork https://github.com/yourusername/studyflow.git
-````
+   git fork https://github.com/Ajor-Saha/DeltaCoders-Final-Test
+
+   ```
 
 2. **Create Feature Branch**
 
