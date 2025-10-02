@@ -9,7 +9,7 @@ import { nanoid } from 'nanoid';
 import { db } from '../db';
 import { cognitiveAssessmentsTable } from '../db/schema/tbl-cognitive-assessments';
 import { gameAnalyticsTable } from '../db/schema/tbl-game-analytics';
-import { notesTable } from '../db/schema/tbl-notes';
+// import { notesTable } from '../db/schema/tbl-notes'; // Commented out - table doesn't exist yet
 import { quizResultsTable } from '../db/schema/tbl-quiz-results';
 import { quizzesTable } from '../db/schema/tbl-quizzes';
 import { shortQuestionExamsTable } from '../db/schema/tbl-short-question-exams';
@@ -415,13 +415,13 @@ export const syncUserDataToVectorDB = asyncHandler(
         .orderBy(desc(cognitiveAssessmentsTable.createdAt))
         .limit(15); // Recent cognitive assessments for learning-stress correlation
 
-      // 7. Get user's personal notes
-      const userNotes = await db
-        .select()
-        .from(notesTable)
-        .where(eq(notesTable.userId, userId))
-        .orderBy(notesTable.createdAt)
-        .limit(5); // Reduced from 10 to prevent memory issues
+      // 7. Get user's personal notes - COMMENTED OUT: notes table doesn't exist yet
+      // const userNotes = await db
+      //   .select()
+      //   .from(notesTable)
+      //   .where(eq(notesTable.userId, userId))
+      //   .orderBy(notesTable.createdAt)
+      //   .limit(5); // Reduced from 10 to prevent memory issues
 
       // 5. Get user's personal notes
       const documents: Document[] = [];
@@ -565,23 +565,23 @@ export const syncUserDataToVectorDB = asyncHandler(
         );
       }
 
-      // Process user's personal notes
-      for (const note of userNotes) {
-        documents.push(
-          new Document({
-            pageContent: `Personal note: "${note.title}". ${
-              note.description || 'No description provided.'
-            }`,
-            metadata: {
-              type: 'user_note',
-              noteId: note.noteId,
-              title: note.title,
-              createdAt: note.createdAt,
-              userId: userId,
-            },
-          })
-        );
-      }
+      // Process user's personal notes - COMMENTED OUT: notes table doesn't exist yet
+      // for (const note of userNotes) {
+      //   documents.push(
+      //     new Document({
+      //       pageContent: `Personal note: "${note.title}". ${
+      //         note.description || 'No description provided.'
+      //       }`,
+      //       metadata: {
+      //         type: 'user_note',
+      //         noteId: note.noteId,
+      //         title: note.title,
+      //         createdAt: note.createdAt,
+      //         userId: userId,
+      //       },
+      //     })
+      //   );
+      // }
 
       // Process game analytics for mental health insights
       for (const game of recentGameAnalytics) {
@@ -799,7 +799,7 @@ Educational Impact: This assessment helps identify how mental state affects lear
               recentShortExams: recentShortExams.length,
               gameAnalytics: recentGameAnalytics.length,
               cognitiveAssessments: recentCognitiveAssessments.length,
-              personalNotes: userNotes.length,
+              personalNotes: 0, // userNotes.length - notes table not implemented yet
             },
           },
           totalSynced > 0

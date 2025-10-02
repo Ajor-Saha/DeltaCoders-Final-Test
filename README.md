@@ -1,142 +1,243 @@
 # StudyFlow - AI-Powered Educational Learning Platform
 
-A comprehensive educational platform that combines AI-powered content generation, interactive learning, and progress tracking to deliver personalized learning experiences.
+- [1. 📖 Introduction](#1--introduction)
+- [2. 🎯 Problem Statement](#2--problem-statement)
+- [3. 🚀 Live Demo](#3--live-demo)
+- [4. ✨ Key Features](#4--key-features)
+- [5. 🛠️ Technical Stack](#5--technical-stack)
+- [6. 📦 Installation](#6--installation)
+- [7. 📁 Project Structure](#7--project-structure)
+- [8. 🤝 Contributing](#8--contributing)
+- [9. 📄 License](#9--license)
+- [10. 🙏 Acknowledgments](#10--acknowledgments)
 
-## 🚀 Features
+---
 
-### Core Features
+## 1. 📖 Introduction
 
-- **AI-Powered Content Generation**: Dynamic lesson content and quiz generation using advanced AI
-- **Interactive Learning Modules**: Comprehensive lessons, quizzes, and short questions
-- **Progress Tracking**: Real-time tracking of topic completion and learning progress
-- **Subject Management**: Organized learning paths with topic-based structure
-- **Quiz System**: Adaptive quizzes with instant feedback
-- **AI Helper**: Contextual assistance and explanations using AI
+StudyFlow is an innovative AI-powered educational platform that revolutionizes the way students learn and educators teach. By leveraging cutting-edge artificial intelligence, we create personalized learning experiences that adapt to individual needs, making education more engaging, effective, and accessible.
 
-### Learning Features
+Our platform combines intelligent content generation, interactive learning modules, comprehensive progress tracking, and real-time AI assistance to deliver a complete educational ecosystem. Whether you're a student seeking to master new concepts or an educator looking to enhance your teaching methods, StudyFlow provides the tools and insights needed for academic success.
 
-- **Adaptive Quizzes**: AI-generated quizzes tailored to topic difficulty
-- **Lesson Content**: Interactive lessons with markdown support
-- **Short Questions**: Quick assessment tools
-- **Resources Management**: Organized learning materials
-- **Weakness Analysis**: Identify and focus on challenging topics
-- **Games Integration**: Gamified learning experiences
+## 2. 🎯 Problem Statement
 
-### Technical Features
+Traditional educational approaches face several critical challenges in today's digital age:
 
-- **JWT Authentication**: Secure user authentication and authorization
-- **Real-time Updates**: Live progress updates and content synchronization
-- **Caching System**: Optimized content delivery and performance
-- **File Upload**: Support for various educational materials
-- **Email Integration**: Notifications and communication system
+- **Generic Content Delivery**: One-size-fits-all educational content that doesn't adapt to individual learning styles and paces
+- **Limited Personalization**: Lack of personalized learning paths that address specific strengths and weaknesses
+- **Ineffective Progress Tracking**: Difficulty in accurately measuring learning progress and identifying knowledge gaps
+- **Resource Accessibility**: Limited access to diverse, high-quality educational materials and real-time assistance
+- **Engagement Issues**: Traditional learning methods often fail to maintain student engagement and motivation
+- **Assessment Challenges**: Static assessments that don't provide immediate feedback or adapt to student performance
 
-## 🛠️ Tech Stack
+StudyFlow addresses these challenges by:
 
-### Frontend
+- **AI-Driven Personalization**: Creating adaptive learning experiences tailored to each individual
+- **Intelligent Content Generation**: Producing dynamic, relevant educational content using advanced AI
+- **Real-Time Analytics**: Providing comprehensive insights into learning progress and performance
+- **Accessible AI Assistance**: Offering 24/7 intelligent tutoring and support
+- **Gamified Learning**: Implementing engaging, interactive elements to boost motivation
+- **Adaptive Assessment**: Creating dynamic quizzes and evaluations that adjust to student performance
 
-- **Framework**: Next.js 15.2.2 with React 19
-- **Styling**: Tailwind CSS with custom components
-- **UI Components**: Radix UI primitives with shadcn/ui
-- **Icons**: Lucide React, React Icons
-- **Animations**: Framer Motion
-- **State Management**: Zustand
-- **Forms**: React Hook Form with Zod validation
-- **Rich Text**: Quill editor, React Markdown
-- **Charts**: Recharts for data visualization
+## 4. ✨ Key Features
 
-### Backend
+🌐 **[Experience StudyFlow Live](https://study-flow.taskforges.com)**
 
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Database**: Neon PostgreSQL with Drizzle ORM
-- **AI Integration**: Google GenAI, OpenAI, Langchain
-- **Vector Database**: Pinecone for AI embeddings
-- **Authentication**: JWT with bcrypt
-- **File Storage**: AWS S3
-- **Email**: Nodemailer
-- **Real-time**: Socket.IO
+### ⚠️ Important Notes
 
-## 📦 Installation
+- **Server Startup**: The backend is deployed on Render's free tier, so initial server response may take anywhere from a few seconds to a few minutes. Please be patient during the first request.
+- **Login Issue**: There's a known production issue where the dashboard might not load after the first login attempt. If this happens, try logging in again - multiple attempts usually resolve the issue.
+
+### Demo Credentials
+
+- **Email**: sokarama79@gmail.com
+- **Password**: sokarama79@gmail.com
+
+## 3. ✨ Key Features
+
+### 🧠 AI-Powered Learning Engine
+
+- **Intelligent Content Generation**: Dynamically creates lessons, quizzes, and educational materials using OpenAI GPT and Google's Gemini AI
+- **Adaptive Learning Paths**: Personalizes learning journeys based on individual progress and performance analytics
+- **Smart Tutoring System**: Provides contextual assistance and explanations through our AI chatbot with platform-specific guidance
+- **Weakness Detection**: Analyzes performance patterns to identify and focus on challenging topics
+
+### 📚 Comprehensive Subject Management
+
+- **Structured Learning**: Organized subjects with topic-based curriculum structure
+- **Progress Tracking**: Real-time visualization of completion rates and learning milestones
+- **Subject Discovery**: Explore and add subjects to create personalized learning paths
+- **Topic Mastery**: Track detailed progress within each subject's topics
+
+### 🎯 Interactive Assessment System
+
+- **AI-Generated Quizzes**: Creates adaptive quizzes tailored to topic difficulty and student performance
+- **Instant Feedback**: Provides immediate results and explanations for better understanding
+- **Multiple Question Types**: Supports various assessment formats including MCQs, short answers, and essay questions
+- **Performance Analytics**: Detailed insights into quiz performance and improvement areas
+
+### 🎮 Gamified Learning Experience
+
+- **Interactive Games**: Educational games that make learning fun and engaging
+- **Achievement System**: Rewards and badges for reaching learning milestones
+- **Leaderboards**: Competitive elements to motivate continuous learning
+- **Progress Visualization**: Beautiful charts and graphs to track learning journey
+
+### 💻 Modern Technical Infrastructure
+
+- **Real-Time Synchronization**: Live updates across all devices and sessions
+- **Secure Authentication**: JWT-based authentication with refresh token support
+- **File Management**: Upload and organize educational materials and resources
+- **Responsive Design**: Seamless experience across desktop, tablet, and mobile devices
+
+### 🔍 Advanced Analytics & Insights
+
+- **Learning Analytics**: Comprehensive dashboard with performance metrics
+- **Weakness Analysis**: Identifies knowledge gaps and suggests improvement strategies
+- **Time Tracking**: Monitors study time and learning patterns
+- **Progress Reports**: Detailed reports for students and educators
+
+## 4. 🛠️ Technical Stack
+
+### Frontend Architecture
+
+- **Framework**: Next.js 15.2.2 with React 19 and TypeScript
+- **Styling**: Tailwind CSS with custom design system
+- **UI Components**:
+  - Radix UI primitives for accessibility
+  - shadcn/ui for consistent design components
+  - Custom components for platform-specific features
+- **Icons & Graphics**: Lucide React, React Icons for comprehensive iconography
+- **Animations**: Framer Motion for smooth, engaging user interactions
+- **State Management**: Zustand for lightweight, efficient state handling
+- **Form Handling**: React Hook Form with Zod validation for type-safe forms
+- **Rich Content**:
+  - Quill editor for rich text editing
+  - React Markdown for content rendering
+  - Syntax highlighting for code examples
+- **Data Visualization**: Recharts for interactive charts and progress tracking
+
+### Backend Infrastructure
+
+- **Runtime**: Node.js with TypeScript for type safety
+- **Framework**: Express.js with middleware architecture
+- **Database**:
+  - Neon PostgreSQL for scalable data storage
+  - Drizzle ORM for type-safe database operations
+  - Connection pooling for optimal performance
+- **AI Integration**:
+  - OpenAI GPT API for content generation
+  - Google Gemini AI for alternative AI processing
+  - SmythOS Agent Builder
+  - LangChain for AI workflow orchestration
+  - Pinecone vector database for semantic search and RAG
+- **Authentication**: JWT with bcrypt for secure user management
+- **File Storage**: AWS S3 compatible storage (Cloudflare R2)
+- **Communication**:
+  - Nodemailer for email notifications
+  - Socket.IO for real-time features
+- **Agent Orchestration**: SmythOS Agent Builder
+
+### Development & DevOps
+
+- **Package Management**: pnpm for efficient dependency management
+- **Code Quality**: ESLint, Prettier for consistent code style
+- **Build Tools**: Next.js built-in compiler and bundling
+- **Database Management**: Drizzle Kit for migrations and schema management
+- **Environment Management**: Environment-specific configurations
+- **API Documentation**: RESTful API with comprehensive endpoint documentation
+
+## 6. 📦 Installation
 
 ### Prerequisites
 
-- Node.js 18+
-- PostgreSQL database (Neon recommended)
-- AWS S3 bucket (for file storage)
-- OpenAI API key
-- Google GenAI API key
-- Pinecone account
+Ensure you have the following installed:
 
-### Environment Variables
+- **Node.js** 18+ (LTS recommended)
+- **PostgreSQL** database (Neon recommended)
+- **pnpm** package manager (recommended) or npm
+- **Git** for version control
 
-#### Client (.env.local)
+### API Keys Required
+
+- **OpenAI API Key** for content generation
+- **Google Gemini API Key** for AI processing
+- **SmythOS Agent LLM Key** for agent orchestration
+- **Pinecone API Key** for vector database
+- **Cloudflare R2** credentials for file storage
+- **Gmail App Password** for email notifications
+
+### Environment Configuration
+
+#### Client Environment (`.env.local`)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_APP_NAME=EduLearn
+NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8000
 ```
 
-#### Server (.env)
+#### Server Environment (`.env`)
 
 ```env
-# Database
-DATABASE_URL=your_neon_database_url
-DB_HOST=your_db_host
-DB_PORT=5432
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-DB_NAME=your_db_name
+# Database Configuration
+DATABASE_URL=postgresql://username:password@host:port/database?sslmode=require&channel_binding=require
 
-# JWT
-JWT_SECRET=your_jwt_secret
-JWT_REFRESH_SECRET=your_jwt_refresh_secret
-
-# AI Services
-OPENAI_API_KEY=your_openai_api_key
-GOOGLE_GENAI_API_KEY=your_google_genai_key
-PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_ENVIRONMENT=your_pinecone_environment
-
-# AWS S3
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=your_aws_region
-AWS_S3_BUCKET=your_s3_bucket_name
-
-# Email
-SMTP_HOST=your_smtp_host
-SMTP_PORT=587
-SMTP_USER=your_smtp_user
-SMTP_PASS=your_smtp_password
-
-# App
+# Server Configuration
 PORT=8000
+JWT_SECRET=your_jwt_secret_key
+
+# Email Configuration (Gmail App Password)
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+
+# SmythOS Agent LLM API Key
+SMYTHOS_AGENTLLM_KEY=sk-your_smythos_agent_key
+
+# Cloudflare R2 Bucket Credentials
+TOKEN_VALUE=your_cloudflare_r2_token
+ACCESS_KEY_ID=your_access_key_id
+SECRET_ACCESS_KEY=your_secret_access_key
+ENDPOINT_URL=https://your_account_id.r2.cloudflarestorage.com
+PUBLIC_ACCESS_URL=https://pub-your_public_id.r2.dev
+BUCKET_NAME=your_bucket_name
+
+# AI API Keys
+GEMINI_API_KEY="your_gemini_api_key"
+OPENAI_API_KEY=sk-proj-your_openai_api_key
+
+# Environment Configuration
 NODE_ENV=development
-CLIENT_URL=http://localhost:3000
+
+# SmythOS API Endpoints
+TOPIC_LIST_URL=https://your_topic_list_agent.agent.a.smyth.ai/api/generate_topic_list
+MENTAL_STATUS_URL=https://your_mental_status_agent.agent.a.smyth.ai/api/evaluate_quiz
+
+# Pinecone Vector Database
+PINECONE_API_KEY=pcsk_your_pinecone_api_key
+PINECONE_INDEX=your_index_name
 ```
 
-### Setup Instructions
+### Quick Start
 
-1. **Clone the repository**
+1. **Clone the Repository**
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Ajor-Saha/DeltaCoders-Final-Test
 cd DeltaCoders-Final-Test
 ```
 
-1. **Install dependencies**
+2. **Install Dependencies**
 
 ```bash
 # Install client dependencies
 cd client
-npm install
+pnpm install
 
 # Install server dependencies
 cd ../server
 npm install
 ```
 
-1. **Database Setup**
+3. **Database Setup**
 
 ```bash
 cd server
@@ -147,193 +248,158 @@ npm run db:generate
 # Run migrations
 npm run db:migrate
 
-# (Optional) Open database studio
-npm run db:studio
+# Push schema changes
+npm run db:push
 ```
 
-1. **Start Development Servers**
+4. **Start Development Environment**
 
-Terminal 1 - Backend:
+Open two terminal windows:
+
+**Terminal 1 - Backend Server:**
 
 ```bash
 cd server
 npm run dev
 ```
 
-Terminal 2 - Frontend:
+**Terminal 2 - Frontend Application:**
 
 ```bash
 cd client
-npm run dev
+pnpm dev
 ```
 
-1. **Access the Application**
+5. **Access Your Application**
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- Database Studio: http://localhost:4983 (if running)
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
 
-## 📁 Project Structure
+## 7. 📁 Project Structure
 
-```fs
-DeltaCoders-Final-Test/
+```
+studyflow/
+├── README.md                        # Project documentation
 ├── client/                          # Frontend Next.js application
 │   ├── src/
-│   │   ├── app/                     # App router pages
+│   │   ├── app/                     # App Router pages and layouts
 │   │   │   ├── (admin)/            # Admin dashboard routes
-│   │   │   ├── (application)/      # Public application routes
-│   │   │   └── (auth)/             # Authentication routes
-│   │   ├── components/             # Reusable UI components
-│   │   │   ├── ui/                # Base UI components (shadcn)
-│   │   │   └── custom/            # Custom components
-│   │   ├── lib/                   # Utilities and configurations
-│   │   └── styles/                # Global styles
-│   ├── public/                    # Static assets
-│   └── package.json
+│   │   │   ├── (application)/      # Main application routes
+│   │   │   ├── (auth)/             # Authentication pages
+│   │   │   ├── globals.css         # Global styles
+│   │   │   └── layout.tsx          # Root layout
+│   │   ├── components/             # Reusable React components
+│   │   │   ├── ui/                 # Base UI components (shadcn/ui)
+│   │   │   ├── admin/              # Admin-specific components
+│   │   │   ├── charts/             # Data visualization components
+│   │   │   ├── chatbot/            # AI chatbot components
+│   │   │   ├── games/              # Educational game components
+│   │   │   └── header/             # Navigation components
+│   │   ├── config/                 # Configuration files
+│   │   ├── constants/              # Application constants
+│   │   ├── hooks/                  # Custom React hooks
+│   │   ├── lib/                    # Utility functions
+│   │   ├── schemas/                # Zod validation schemas
+│   │   ├── store/                  # Zustand state management
+│   │   └── types/                  # TypeScript type definitions
+│   ├── public/                     # Static assets
+│   │   └── asset/                  # Images and media files
+│   └── package.json                # Frontend dependencies
 │
-├── server/                        # Backend Express.js application
+├── server/                         # Backend Express.js application
 │   ├── src/
-│   │   ├── controllers/          # Route controllers
-│   │   ├── middleware/           # Express middleware
-│   │   ├── routes/              # API routes
-│   │   ├── db/                  # Database configuration
-│   │   ├── utils/               # Helper functions
-│   │   └── index.ts            # Server entry point
-│   └── package.json
-│
-└── README.md
+│   │   ├── index.ts               # Server entry point
+│   │   ├── config/                # Server configuration
+│   │   ├── controllers/           # Request handlers
+│   │   │   ├── auth-controllers.ts
+│   │   │   ├── dashboard-controllers.ts
+│   │   │   ├── aibot-controllers.ts
+│   │   │   └── ...
+│   │   ├── data/                  # Static data and seeds
+│   │   ├── db/                    # Database configuration
+│   │   │   ├── index.ts          # Database connection
+│   │   │   └── schema.ts         # Drizzle schema definitions
+│   │   ├── middleware/            # Express middleware
+│   │   ├── routes/                # API route definitions
+│   │   ├── types/                 # TypeScript types
+│   │   └── utils/                 # Helper functions
+│   ├── drizzle/                   # Database migrations
+│   └── package.json               # Backend dependencies
 ```
 
-## 🔧 API Endpoints
+````
 
-### Authentication
 
-- `POST /api/auth/login` - User login
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/logout` - User logout
+### Development Guidelines
 
-### Subjects
+- **Code Style**: Follow TypeScript best practices with strict type checking
+- **Commit Convention**: Use conventional commits for clear history
+- **Testing**: Write unit tests for critical functionality
+- **Documentation**: Keep inline documentation updated
+- **Performance**: Optimize for Core Web Vitals and loading speed
 
-- `GET /api/subject/all` - Get all subjects
-- `GET /api/subject/:subjectId` - Get subject by ID
-- `GET /api/subject/progress/:subjectId` - Get subject progress
-- `POST /api/subject/add-subject` - Add user subject
-- `DELETE /api/subject/remove/:userSubjectId` - Remove user subject
 
-### Content Generation
 
-- `POST /api/content/generate-lesson` - Generate AI lesson content
-- `POST /api/quiz/generate` - Generate AI quiz
-- `GET /api/quiz/load/:topicId` - Load existing quiz
+## 8. 🤝 Contributing
 
-### Progress Tracking
+We welcome contributions from the community! Here's how you can help:
 
-- `GET /api/progress/user` - Get user progress
-- `POST /api/progress/update` - Update progress
+### Getting Started
 
-## 🎯 Usage
+1. **Fork the Repository**
 
-### For Students
+   ```bash
+   git fork https://github.com/yourusername/studyflow.git
+````
 
-1. **Register/Login** to access the platform
-2. **Browse Subjects** and add them to your learning path
-3. **Explore Topics** within each subject
-4. **Study Lessons** with AI-generated content
-5. **Take Quizzes** to test your knowledge
-6. **Track Progress** and identify weak areas
-7. **Access Resources** for additional learning materials
+2. **Create Feature Branch**
 
-### For Educators
+   ```bash
+   git checkout -b feature/amazing-new-feature
+   ```
 
-1. **Generate Content** using AI-powered tools
-2. **Create Quizzes** tailored to specific topics
-3. **Monitor Progress** of learners
-4. **Analyze Weaknesses** to provide targeted support
-5. **Manage Resources** and learning materials
+3. **Make Changes**
 
-## 🧪 Development
+   - Follow our coding standards
+   - Add tests for new functionality
+   - Update documentation
 
-### Available Scripts
+4. **Submit Pull Request**
+   ```bash
+   git commit -m "feat: add amazing new feature"
+   git push origin feature/amazing-new-feature
+   ```
 
-#### Client
+### Contribution Guidelines
 
-```bash
-npm run dev        # Start development server
-npm run build      # Build for production
-npm run start      # Start production server
-npm run lint       # Run ESLint
-```
+- **Bug Reports**: Use GitHub issues with detailed reproduction steps
+- **Feature Requests**: Discuss new features in GitHub discussions
+- **Code Style**: Follow existing patterns and ESLint rules
+- **Testing**: Ensure all tests pass before submitting
+- **Documentation**: Update relevant documentation for changes
 
-#### Server
+## 9. 📄 License
 
-```bash
-npm run dev        # Start development server with watch mode
-npm run build      # Compile TypeScript
-npm run start      # Start production server
-npm run db:generate # Generate database schema
-npm run db:migrate  # Run database migrations
-npm run db:studio   # Open database studio
-npm run db:push     # Push schema changes
-```
+This project is licensed under the **ISC License**. See the [LICENSE](LICENSE) file for complete details.
 
-### Code Style
+## 10. 🙏 Acknowledgments
 
-- **TypeScript** for type safety
-- **ESLint** for code linting
-- **Prettier** for code formatting (recommended)
-- **Conventional Commits** for commit messages
+We're grateful to the following technologies and communities:
 
-## 🚀 Deployment
+### Development Tools
 
-### Frontend (Vercel - Recommended)
+- **TypeScript** for type safety and developer experience
+- **ESLint** and **Prettier** for code quality
+- **GitHub** for version control and collaboration
 
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+### Special Thanks
 
-### Backend (Railway/Heroku)
-
-1. Create a new application
-2. Set environment variables
-3. Connect to your database
-4. Deploy using Git or Docker
-
-### Database (Neon)
-
-1. Create a Neon project
-2. Copy connection string to `DATABASE_URL`
-3. Run migrations: `npm run db:migrate`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the ISC License. See the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- **OpenAI** for GPT integration
-- **Google** for GenAI services
-- **Vercel** for Next.js framework
-- **Neon** for PostgreSQL database
-- **shadcn/ui** for beautiful UI components
-- **Radix UI** for accessible primitives
-
-## 📞 Support
-
-For support and questions:
-
-- Create an issue on GitHub
-- Contact the development team
-- Check documentation and API references
+- The open-source community for incredible tools and libraries
+- Beta testers and early adopters for valuable feedback
+- Educational institutions for inspiring our mission
 
 ---
 
-### **Built with ❤️ for the future of education**
+### **🎓 Built with ❤️ for the future of education**
+
+**StudyFlow** - Empowering learners and educators with AI-driven personalized education.
