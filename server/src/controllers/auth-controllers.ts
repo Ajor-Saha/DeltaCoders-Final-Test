@@ -201,6 +201,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     const loginUser = user[0];
 
     return res.status(200).json({
+      success: true,
       data: loginUser,
       accessToken: accessToken,
       message: 'Login successful',

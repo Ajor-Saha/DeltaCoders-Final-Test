@@ -46,7 +46,6 @@ StudyFlow addresses these challenges by:
 ### ⚠️ Important Notes
 
 - **Server Startup**: The backend is deployed on Render's free tier, so initial server response may take anywhere from a few seconds to a few minutes. Please be patient during the first request.
-- **Login Issue**: There's a known production issue where the dashboard might not load after the first login attempt. If this happens, try logging in again - multiple attempts usually resolve the issue.
 
 ### Demo Credentials
 

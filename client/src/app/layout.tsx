@@ -1,8 +1,8 @@
+import ThemeProviderWrapper from "@/components/header/ThemeProviderWrapper";
+import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
-import ThemeProviderWrapper from "@/components/header/ThemeProviderWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,43 +23,49 @@ export const metadata: Metadata = {
       follow: true,
     },
   },
-  title: "Company Task Management System",
+  title: "StudyFlow - AI-Powered Educational Learning Platform",
   description:
-    "Streamline task assignments, track progress, and improve team productivity with our Company Task Management System. Manage employees, projects, and deadlines efficiently.",
+    "StudyFlow revolutionizes education with AI-powered personalized learning experiences. Create adaptive learning paths, generate intelligent content, track progress, and get real-time AI assistance for effective and engaging education.",
   keywords: [
-    "Task Management",
-    "Project Tracking",
-    "Employee Management",
-    "Team Collaboration",
-    "Task Automation",
-    "Company Workflow",
+    "AI Education",
+    "Personalized Learning",
+    "Educational Technology",
+    "Adaptive Learning",
+    "AI Tutoring",
+    "StudyFlow",
+    "Online Learning",
+    "Educational Platform",
+    "AI-Generated Content",
+    "Learning Analytics",
+    "Interactive Learning",
+    "Educational AI",
   ],
   openGraph: {
-    title: "Company Task Management System",
+    title: "StudyFlow - AI-Powered Educational Learning Platform",
     description:
-      "Enhance workplace efficiency with our powerful task management system. Assign tasks, monitor deadlines, and optimize productivity effortlessly.",
-    url: "https://your-company-task-management.com", // Replace with your actual website URL
+      "Transform your learning experience with StudyFlow's AI-driven personalized education platform. Adaptive learning paths, intelligent content generation, and real-time AI assistance.",
+    url: "https://study-flow.taskforges.com",
     type: "website",
     images: [
       {
-        url: "https://your-company-task-management.com/banner.jpg", // Replace with actual image URL
+        url: "https://drive.google.com/uc?id=1vmNdUL9q3mmBusgQ15y-td0gXRc_2c5R", // Replace with actual image URL
         width: 1200,
         height: 630,
-        alt: "Company Task Management System banner",
+        alt: "StudyFlow AI-Powered Educational Learning Platform",
       },
     ],
-    siteName: "Company Task Management",
+    siteName: "StudyFlow",
   },
   alternates: {
-    canonical: "https://your-company-task-management.com", // Replace with actual canonical URL
+    canonical: "https://study-flow.taskforges.com",
   },
   twitter: {
     card: "summary_large_image",
-    site: "@CompanyTaskMgmt", // Replace with your Twitter handle
-    title: "Company Task Management System",
+    site: "@StudyFlow", // Replace with your Twitter handle
+    title: "StudyFlow - AI-Powered Educational Learning Platform",
     description:
-      "Boost productivity with our all-in-one task management system. Track projects, assign tasks, and improve team collaboration.",
-    images: ["https://your-company-task-management.com/banner.jpg"], // Replace with actual image URL
+      "Revolutionize your education with AI-driven personalized learning. Adaptive paths, intelligent content generation, and 24/7 AI tutoring support.",
+    images: ["https://drive.google.com/uc?id=1vmNdUL9q3mmBusgQ15y-td0gXRc_2c5R"], // Replace with actual image URL
   },
 };
 
