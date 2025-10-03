@@ -20,14 +20,14 @@ export function middleware(request: NextRequest) {
   // Public API endpoints (no auth required)
   const apiPublicPaths = ["/api/topic/starter-feed"];
 
-  // Check for token in cookies with domain-aware handling
+  // Check for token in cookies and headers
   const token = request.cookies.get("accessToken")?.value ||
                 request.headers.get("Authorization")?.replace("Bearer ", "") || "";
 
   const response = NextResponse.next();
 
-  // Set cookie domain to .taskforges.com to allow sharing between subdomains
-  if (token && !request.cookies.get("accessToken")) {
+  // Set cookie domain to .taskforges.com to allow sharing between subdomains in production
+  if (token && !request.cookies.get("accessToken") && process.env.NODE_ENV === 'production') {
     response.cookies.set({
       name: "accessToken",
       value: token,
