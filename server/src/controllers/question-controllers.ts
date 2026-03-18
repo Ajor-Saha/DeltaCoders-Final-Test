@@ -275,7 +275,7 @@ CRITICAL: All awarded marks must be whole numbers (integers) - never use decimal
 
       try {
         const evaluationResponse = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
+          model: 'gemini-3-flash-preview',
           contents: evaluationPrompt,
           config: {
             responseMimeType: 'application/json',
@@ -714,7 +714,7 @@ Generate an exam that effectively assesses student understanding across all topi
       }".`;
 
       const questionResponse = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3-flash-preview',
         contents: questionPrompt,
         config: {
           responseMimeType: 'application/json',
@@ -862,10 +862,10 @@ Generate an exam that effectively assesses student understanding across all topi
             contentLength > 5000
               ? 'comprehensive'
               : contentLength > 3000
-              ? 'detailed'
-              : contentLength > 1500
-              ? 'moderate'
-              : 'basic',
+                ? 'detailed'
+                : contentLength > 1500
+                  ? 'moderate'
+                  : 'basic',
           weakness: weakness || '',
           user_preference: user_preference || '',
           question_distribution: topicsData.map(topic => ({

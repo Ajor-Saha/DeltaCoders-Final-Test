@@ -3,13 +3,14 @@
 - [1. 📖 Introduction](#1--introduction)
 - [2. 🎯 Problem Statement](#2--problem-statement)
 - [3. 🚀 Live Demo](#3--live-demo)
-- [4. ✨ Key Features](#4--key-features)
-- [5. 🛠️ Technical Stack](#5--technical-stack)
-- [6. 📦 Installation](#6--installation)
-- [7. 📁 Project Structure](#7--project-structure)
-- [8. 🤝 Contributing](#8--contributing)
-- [9. 📄 License](#9--license)
-- [10. 🙏 Acknowledgments](#10--acknowledgments)
+- [4. 🎬 Live Video Demonstration](#4--live-video-demonstration)
+- [5. ✨ Key Features](#5--key-features)
+- [6. 🛠️ Technical Stack](#6--technical-stack)
+- [7. 📦 Installation](#7--installation)
+- [8. 📁 Project Structure](#8--project-structure)
+- [9. 🤝 Contributing](#9--contributing)
+- [10. 📄 License](#10--license)
+- [11. 🙏 Acknowledgments](#11--acknowledgments)
 
 ---
 
@@ -52,7 +53,15 @@ StudyFlow addresses these challenges by:
 - **Email**: sokarama79@gmail.com
 - **Password**: sokarama79@gmail.com
 
-## 4. ✨ Key Features
+## 4. 🎬 Live Video Demonstration
+
+## Video Demonstrations
+
+Watch our platform in action:
+
+[![Study Flow Demo](https://img.youtube.com/vi/SaCoIQQgDlw/maxresdefault.jpg)](https://youtu.be/SaCoIQQgDlw?si=RofbgUg8D2AZxgqq)
+
+## 5. ✨ Key Features
 
 ### 🧠 AI-Powered Learning Engine
 
@@ -96,7 +105,7 @@ StudyFlow addresses these challenges by:
 - **Time Tracking**: Monitors study time and learning patterns
 - **Progress Reports**: Detailed reports for students and educators
 
-## 5. 🛠️ Technical Stack
+## 6. 🛠️ Technical Stack
 
 ### Frontend Architecture
 
@@ -146,7 +155,7 @@ StudyFlow addresses these challenges by:
 - **Environment Management**: Environment-specific configurations
 - **API Documentation**: RESTful API with comprehensive endpoint documentation
 
-## 6. 📦 Installation
+## 7. 📦 Installation
 
 ### Prerequisites
 
@@ -274,7 +283,7 @@ pnpm dev
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 
-## 7. 📁 Project Structure
+## 8. 📁 Project Structure
 
 ```
 studyflow/
@@ -334,7 +343,7 @@ studyflow/
 - **Documentation**: Keep inline documentation updated
 - **Performance**: Optimize for Core Web Vitals and loading speed
 
-## 8. 🤝 Contributing
+## 9. 🤝 Contributing
 
 We welcome contributions from the community! Here's how you can help:
 
@@ -354,7 +363,6 @@ We welcome contributions from the community! Here's how you can help:
    ```
 
 3. **Make Changes**
-
    - Follow our coding standards
    - Add tests for new functionality
    - Update documentation
@@ -373,11 +381,11 @@ We welcome contributions from the community! Here's how you can help:
 - **Testing**: Ensure all tests pass before submitting
 - **Documentation**: Update relevant documentation for changes
 
-## 9. 📄 License
+## 10. 📄 License
 
 This project is licensed under the **ISC License**. See the [LICENSE](LICENSE) file for complete details.
 
-## 10. 🙏 Acknowledgments
+## 11. 🙏 Acknowledgments
 
 We're grateful to the following technologies and communities:
 
